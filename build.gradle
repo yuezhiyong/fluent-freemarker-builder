@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'freemarker.fluent.builder'
+version = '1.0.0'
+
+// Java 版本
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Freemarker
+    implementation 'org.freemarker:freemarker:2.3.32'
+
+    // 日志
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    implementation 'org.slf4j:slf4j-simple:1.7.36'
+
+    // 👇 Lombok 依赖
+    implementation 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'  // 启用注解处理器
+
+    // 测试也需要
+    testCompileOnly 'org.projectlombok:lombok:1.18.30'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+
+    // 测试
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+}
+
+// 编译选项：UTF-8 & Java 8
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << "-Xlint:unchecked"
+}
+
+
+test {
+    maxParallelForks = 3
+    useJUnitPlatform()
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
