@@ -1,6 +1,8 @@
 package fluent.freemarker.builder;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -16,9 +18,7 @@ public class AstJson {
 
     public static String toJson(List<FtlNode> root) {
         try {
-            // Use writeValueAsString with explicit type to trigger polymorphic serialization
-            return MAPPER.writerFor(MAPPER.getTypeFactory().constructCollectionType(List.class, FtlNode.class))
-                         .writeValueAsString(root);
+            return MAPPER.writerFor(new TypeReference<List<FtlNode>>() {}).writeValueAsString(root);
         } catch (JsonProcessingException e) {
             throw new TemplateSyntaxException(e);
         }

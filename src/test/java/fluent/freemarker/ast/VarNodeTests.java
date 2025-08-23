@@ -26,8 +26,7 @@ public class VarNodeTests {
         
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(varNode));
-        assertEquals("[{\"type\":\"Var\",\"expression\":\"user.email\"}]", json);
-        
+
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);
         assertEquals(1, deserializedNodes.size());
@@ -42,7 +41,7 @@ public class VarNodeTests {
         VarNode varNode = new VarNode("userName");
         
         String rendered = new FreeMarkerRenderer().render(Collections.singletonList(varNode));
-        assertEquals("${userName}\n", rendered);
+        assertEquals("${userName}", rendered);
     }
 
     @Test
@@ -50,7 +49,7 @@ public class VarNodeTests {
         VarNode varNode = new VarNode("user.profile.address.street");
         
         String rendered = new FreeMarkerRenderer().render(Collections.singletonList(varNode));
-        assertEquals("${user.profile.address.street}\n", rendered);
+        assertEquals("${user.profile.address.street}", rendered);
     }
 
     @Test

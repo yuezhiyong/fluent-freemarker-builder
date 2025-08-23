@@ -28,8 +28,8 @@ public class CommentNodeTests {
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(commentNode));
         assertNotNull(json);
-        assertTrue(json.contains("\"type\":\"Comment\""));
-        assertTrue(json.contains("\"text\":\"Test comment for serialization\""));
+        assertTrue(json.contains("\"type\" : \"Comment\""));
+        assertTrue(json.contains("\"text\" : \"Test comment for serialization\""));
         
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);

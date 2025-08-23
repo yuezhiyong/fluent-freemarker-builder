@@ -2,9 +2,11 @@ package fluent.freemarker.ast;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import lombok.Getter;
 
 @Getter
+@JsonTypeName("TEXT")
 public class TextNode implements FtlNode {
 
     private final String text;

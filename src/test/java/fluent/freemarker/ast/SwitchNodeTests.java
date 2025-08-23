@@ -18,12 +18,12 @@ public class SwitchNodeTests {
     @Test
     public void testSwitchNodeCreation() {
         List<CaseNode> cases = Arrays.asList(
-            new CaseNode(Arrays.asList(new LiteralExpr("admin")), 
-                        Arrays.asList(new TextNode("Admin access"))),
-            new CaseNode(Arrays.asList(new LiteralExpr("user")), 
-                        Arrays.asList(new TextNode("User access")))
+            new CaseNode(Collections.singletonList(new LiteralExpr("admin")),
+                    Collections.singletonList(new TextNode("Admin access"))),
+            new CaseNode(Collections.singletonList(new LiteralExpr("user")),
+                    Collections.singletonList(new TextNode("User access")))
         );
-        List<FtlNode> defaultBlock = Arrays.asList(new TextNode("Guest access"));
+        List<FtlNode> defaultBlock = Collections.singletonList(new TextNode("Guest access"));
         
         SwitchNode switchNode = new SwitchNode(new LiteralExpr("user.role"), cases, defaultBlock);
         
@@ -34,18 +34,18 @@ public class SwitchNodeTests {
 
     @Test
     public void testSwitchNodeSerialization() throws Exception {
-        List<CaseNode> cases = Arrays.asList(
-            new CaseNode(Arrays.asList(new LiteralExpr("active")), 
-                        Arrays.asList(new TextNode("User is active")))
+        List<CaseNode> cases = Collections.singletonList(
+                new CaseNode(Collections.singletonList(new LiteralExpr("active")),
+                        Collections.singletonList(new TextNode("User is active")))
         );
-        List<FtlNode> defaultBlock = Arrays.asList(new TextNode("User status unknown"));
+        List<FtlNode> defaultBlock = Collections.singletonList(new TextNode("User status unknown"));
         
         SwitchNode switchNode = new SwitchNode(new LiteralExpr("user.status"), cases, defaultBlock);
         
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(switchNode));
         assertNotNull(json);
-        assertTrue(json.contains("\"type\":\"Switch\""));
+        assertTrue(json.contains("\"type\" : \"Switch\""));
         
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);

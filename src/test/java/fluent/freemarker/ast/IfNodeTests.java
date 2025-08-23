@@ -46,8 +46,8 @@ public class IfNodeTests {
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(ifNode));
         assertNotNull(json);
-        assertTrue(json.contains("\"type\":\"If\""));
-        assertTrue(json.contains("\"condition\":\"user.active\""));
+        assertTrue(json.contains("\"type\" : \"If\""));
+        assertTrue(json.contains("\"condition\" : \"user.active\""));
         
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);

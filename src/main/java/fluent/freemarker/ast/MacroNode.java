@@ -12,7 +12,7 @@ import java.util.Map;
 @Getter
 public class MacroNode implements FtlNode {
     public final String name;
-    public final Map<String, String> params;
+    public final Map<String, String> params; // 定义参数,和默认的参数值
     public final List<FtlNode> body;
 
     @JsonCreator

@@ -37,9 +37,9 @@ public class ListNodeTests {
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(listNode));
         assertNotNull(json);
-        assertTrue(json.contains("\"type\":\"List\""));
-        assertTrue(json.contains("\"loopVar\":\"product\""));
-        assertTrue(json.contains("\"listExpr\":\"productList\""));
+        assertTrue(json.contains("\"type\" : \"List\""));
+        assertTrue(json.contains("\"item\" : \"product\""));
+        assertTrue(json.contains("\"listExpression\" : \"productList\""));
         
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);

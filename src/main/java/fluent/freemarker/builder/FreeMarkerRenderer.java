@@ -55,10 +55,13 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
     @Override
     public void visit(MacroNode node) {
         StringBuilder params = new StringBuilder();
-        if (node.params != null) {
-            for (Map.Entry<String, String> entry : node.params.entrySet()) {
-                params.append(entry.getKey()).append("=").append(entry.getValue()).append(" ");
+
+        for (Map.Entry<String, String> entry : node.params.entrySet()) {
+            params.append(entry.getKey());
+            if (entry.getKey() != null) {
+                params.append("=").append("\"").append(entry.getValue()).append("\"");
             }
+            params.append(" ");
         }
         append("<#macro " + node.name + " " + params.toString().trim() + ">");
         for (FtlNode n : node.body) n.accept(this);
@@ -116,8 +119,11 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
     public void visit(AttemptNode node) {
         append("<#attempt>");
         for (FtlNode n : node.attemptBody) n.accept(this);
-        append("<#recover>");
-        for (FtlNode n : node.recoverBody) n.accept(this);
+        if (!node.recoverBody.isEmpty()) {
+            append("<#recover>");
+            for (FtlNode n : node.recoverBody) n.accept(this);
+            append("</#recover>\n");
+        }
         append("</#attempt>");
     }
 

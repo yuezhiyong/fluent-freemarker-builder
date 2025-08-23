@@ -52,7 +52,7 @@ public class AttemptNodeTests {
         // Serialize to JSON
         String json = AstJson.toJson(Collections.singletonList(attemptNode));
         assertNotNull(json);
-        assertTrue(json.contains("\"type\":\"Attempt\""));
+        assertTrue(json.contains("\"type\" : \"Attempt\""));
         
         // Deserialize from JSON
         List<FtlNode> deserializedNodes = AstJson.fromJson(json);
