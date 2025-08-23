@@ -1,6 +1,9 @@
 package fluent.freemarker.validator;
 
-public class TemplateValidationResult {
+import lombok.Getter;
+
+@Getter
+public final class TemplateValidationResult {
     private final boolean valid;
     private final String message;
     private final Exception cause;
@@ -17,18 +20,6 @@ public class TemplateValidationResult {
 
     public static TemplateValidationResult invalid(String message, Exception cause) {
         return new TemplateValidationResult(false, message, cause);
-    }
-
-    public boolean isValid() {
-        return valid;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public Exception getCause() {
-        return cause;
     }
 
     @Override

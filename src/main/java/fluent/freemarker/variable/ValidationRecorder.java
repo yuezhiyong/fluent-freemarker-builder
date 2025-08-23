@@ -62,6 +62,24 @@ public class ValidationRecorder {
         return scopeVariables.contains(varName);
     }
 
+
+    public boolean isDefinedGlobally(String varName) {
+        return globalAssignedVars.contains(varName);
+    }
+
+    /**
+     * 检查变量是否在当前作用域中定义（非全局）
+     */
+    public boolean isDefinedInScope(String name) {
+        // 检查所有作用域（除了全局作用域）
+        for (LocalScope scope : scopeStack) {
+            if (scope.assignedVars.contains(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // 获取所有作用域变量（用于调试）
     public Set<String> getScopeVariables() {
         return new HashSet<>(scopeVariables);
@@ -98,6 +116,7 @@ public class ValidationRecorder {
         }
         return globalAssignedVars.contains(varName);
     }
+
 
     // ====== 内部类：局部作用域 ======
     public static class LocalScope {

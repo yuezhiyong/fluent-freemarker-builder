@@ -193,7 +193,6 @@ public class FtlBuilderTests {
     void testComment() {
         FtlBuilder builder = FtlBuilder.create(context);
         builder.comment("This is a comment");
-
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
         assertTrue(nodes.get(0) instanceof CommentNode);
@@ -229,7 +228,7 @@ public class FtlBuilderTests {
         // 验证变量引用记录
         ValidationRecorder recorder = builder.getValidationRecorder();
         List<VariableReference> refs = recorder.getReferences();
-        assertTrue(refs.size() > 0);
+        assertFalse(refs.isEmpty());
 
         // 验证变量赋值
         assertTrue(recorder.isAssigned("total"));

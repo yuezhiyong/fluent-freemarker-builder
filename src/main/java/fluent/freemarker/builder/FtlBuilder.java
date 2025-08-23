@@ -4,6 +4,9 @@ import fluent.freemarker.ast.*;
 import fluent.freemarker.ast.expr.FtlExpr;
 import fluent.freemarker.ast.expr.IdentifierExpr;
 import fluent.freemarker.ast.expr.LiteralExpr;
+import fluent.freemarker.type.VariableTypeDetectionUtils;
+import fluent.freemarker.type.VariableTypeInfo;
+import fluent.freemarker.utils.PathUtils;
 import fluent.freemarker.validator.ValidationContext;
 import fluent.freemarker.validator.VariableValidationChain;
 import fluent.freemarker.variable.FluentFreemarkerContext;
@@ -101,17 +104,17 @@ public class FtlBuilder {
     public FtlBuilder var(String name) {
         // 只有在有上下文时才记录变量引用
         if (context != null && validationRecorder != null) {
-            String rootVar = getRootVariable(name);
-            // 判断是否是局部变量（在当前作用域中）
-            boolean isLocal = validationRecorder.isInScope(rootVar);
-            String localVarType = isLocal ? validationRecorder.getScopeType(rootVar) : null;
+            ValidationContext validationContext = new ValidationContext(context, validationRecorder);
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext, validationRecorder);
+            // 创建变量引用
+            VariableReference ref = new VariableReference(name, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
             // 记录变量引用用于后续验证
-            VariableReference ref = new VariableReference(name, isLocal, localVarType, getCurrentLocation());
             validationRecorder.record(ref);
         }
         nodes.add(new VarNode(name));
         return this;
     }
+
 
     public FtlBuilder assign(String varName, String valueExpr) {
         // 只有在有上下文时才记录变量赋值
@@ -131,47 +134,40 @@ public class FtlBuilder {
         // 只有在有上下文时才记录条件变量引用
         if (context != null && validationRecorder != null) {
             // 记录条件变量引用
-            boolean isLocal = validationRecorder.isInScope(getRootVariable(condition));
-            String localVarType = isLocal ? validationRecorder.getScopeType(getRootVariable(condition)) : null;
-            VariableReference ref = new VariableReference(condition, isLocal, localVarType, getCurrentLocation());
+            ValidationContext validationContext = new ValidationContext(context, validationRecorder);
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(condition), validationContext, validationRecorder);
+            VariableReference ref = new VariableReference(condition, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
             validationRecorder.record(ref);
         }
 
-        FtlBuilder thenBuilder = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder thenBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         thenBody.accept(thenBuilder);
 
         FtlBuilder elseBuilder = null;
         if (elseBody != null) {
-            elseBuilder = context != null ?
-                    createChild(context, validationRecorder) :
-                    createChildWithoutContext(validationRecorder);
+            elseBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
             elseBody.accept(elseBuilder);
         }
 
-        nodes.add(new IfNode(condition, thenBuilder.build(),
-                elseBuilder != null ? elseBuilder.build() : Collections.emptyList()));
+        nodes.add(new IfNode(condition, thenBuilder.build(), elseBuilder != null ? elseBuilder.build() : Collections.emptyList()));
         return this;
     }
 
     public FtlBuilder list(String item, String listExpr, Consumer<FtlBuilder> body) {
-        FtlBuilder childBuilder = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
-
+        FtlBuilder childBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         // 只有在有上下文时才记录变量引用和管理作用域
         if (context != null && validationRecorder != null) {
+            String name = PathUtils.getRootVariable(listExpr);
             // 记录列表表达式变量引用
-            boolean isLocal = validationRecorder.isInScope(getRootVariable(listExpr));
-            String localVarType = isLocal ? validationRecorder.getScopeType(getRootVariable(listExpr)) : null;
-            VariableReference ref = new VariableReference(listExpr, isLocal, localVarType, getCurrentLocation());
-            validationRecorder.record(ref);
-            // 推入作用域 - item 是列表项变量
-            String itemType = getRootVariable(listExpr) + "." + item;
-            validationRecorder.pushScope(item, itemType);
-            // 使用特殊的标记对象表示这是一个作用域变量
-            validationRecorder.assign(item, new ScopeVariableMarker(itemType));
+            ValidationContext validationContext = new ValidationContext(context, validationRecorder);
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext, validationRecorder);
+            VariableReference listRef = new VariableReference(listExpr, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
+            validationRecorder.record(listRef);
+            // 推入新作用域
+            validationRecorder.pushScope(item, typeInfo.getTypeName());
+            // 推断列表项类型
+            // 在新作用域中定义列表项变量
+            validationRecorder.assign(item, new ScopeVariableMarker(typeInfo.getTypeName()));
             validationRecorder.recordScopeVariable(item); // 记录这是一个作用域变量
         }
         body.accept(childBuilder);
@@ -180,9 +176,7 @@ public class FtlBuilder {
     }
 
     public FtlBuilder macro(String name, Map<String, String> params, Consumer<FtlBuilder> body) {
-        FtlBuilder childBuilder = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder childBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
 
         // 只有在有上下文时才管理宏作用域
         if (context != null && validationRecorder != null) {
@@ -192,6 +186,7 @@ public class FtlBuilder {
             if (params != null) {
                 for (Map.Entry<String, String> entry : params.entrySet()) {
                     validationRecorder.assign(entry.getKey(), entry.getValue());
+                    validationRecorder.recordScopeVariable(entry.getKey());
                 }
             }
         }
@@ -221,27 +216,21 @@ public class FtlBuilder {
     }
 
     public FtlBuilder compress(Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new CompressNode(b.build()));
         return this;
     }
 
     public FtlBuilder escape(String expr, String asVar, Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new EscapeNode(expr, asVar, b.build()));
         return this;
     }
 
     public FtlBuilder noEscape(Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new NoEscapeNode(b.build()));
         return this;
@@ -253,34 +242,25 @@ public class FtlBuilder {
     }
 
     public FtlBuilder attempt(Consumer<FtlBuilder> attemptBody, Consumer<FtlBuilder> recoverBody) {
-        FtlBuilder attemptBuilder = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder attemptBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         attemptBody.accept(attemptBuilder);
 
         FtlBuilder recoverBuilder = null;
         if (recoverBody != null) {
-            recoverBuilder = context != null ?
-                    createChild(context, validationRecorder) :
-                    createChildWithoutContext(validationRecorder);
+            recoverBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
             recoverBody.accept(recoverBuilder);
         }
 
-        nodes.add(new AttemptNode(attemptBuilder.build(),
-                recoverBuilder != null ? recoverBuilder.build() : Collections.emptyList()));
+        nodes.add(new AttemptNode(attemptBuilder.build(), recoverBuilder != null ? recoverBuilder.build() : Collections.emptyList()));
         return this;
     }
 
     public FtlBuilder switchBlock(String expr, Consumer<FtlBuilder> cases, Consumer<FtlBuilder> defaultBody) {
-        FtlBuilder caseBuilder = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder caseBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         cases.accept(caseBuilder);
         FtlBuilder defaultBuilder = null;
         if (defaultBody != null) {
-            defaultBuilder = context != null ?
-                    createChild(context, validationRecorder) :
-                    createChildWithoutContext(validationRecorder);
+            defaultBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
             defaultBody.accept(defaultBuilder);
         }
         // 构建 CaseNode 列表
@@ -290,15 +270,12 @@ public class FtlBuilder {
                 caseNodes.add((CaseNode) node);
             }
         }
-        nodes.add(new SwitchNode(new LiteralExpr(expr), caseNodes,
-                defaultBuilder != null ? defaultBuilder.build() : Collections.emptyList()));
+        nodes.add(new SwitchNode(new LiteralExpr(expr), caseNodes, defaultBuilder != null ? defaultBuilder.build() : Collections.emptyList()));
         return this;
     }
 
     public FtlBuilder caseBlock(String value, Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new CaseNode(Collections.singletonList(new LiteralExpr(value)), b.build()));
         return this;
@@ -325,18 +302,14 @@ public class FtlBuilder {
     }
 
     public FtlBuilder items(Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new ItemsNode(b.build()));
         return this;
     }
 
     public FtlBuilder sep(Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new SepNode(b.build()));
         return this;
@@ -363,9 +336,7 @@ public class FtlBuilder {
     }
 
     public FtlBuilder nested(Consumer<FtlBuilder> body) {
-        FtlBuilder b = context != null ?
-                createChild(context, validationRecorder) :
-                createChildWithoutContext(validationRecorder);
+        FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         body.accept(b);
         nodes.add(new NestedNode(b.build()));
         return this;
