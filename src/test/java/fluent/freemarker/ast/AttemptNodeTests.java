@@ -44,8 +44,8 @@ public class AttemptNodeTests {
 
     @Test
     public void testAttemptNodeSerialization() throws Exception {
-        List<FtlNode> attemptBody = Arrays.asList(new VarNode("risky.operation"));
-        List<FtlNode> recoverBody = Arrays.asList(new TextNode("Operation failed"));
+        List<FtlNode> attemptBody = Collections.singletonList(new VarNode("risky.operation"));
+        List<FtlNode> recoverBody = Collections.singletonList(new TextNode("Operation failed"));
         
         AttemptNode attemptNode = new AttemptNode(attemptBody, recoverBody);
         

@@ -34,7 +34,6 @@ public class TypeInfo {
             for (Field field : clazz.getDeclaredFields()) {
                 if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
                 field.setAccessible(true);
-
                 // 使用 TypeRegistry 获取 TypeInfo（带缓存）
                 TypeInfo fieldTypeInfo = registry.getTypeInfo(field.getType());
                 fields.put(field.getName(), fieldTypeInfo);

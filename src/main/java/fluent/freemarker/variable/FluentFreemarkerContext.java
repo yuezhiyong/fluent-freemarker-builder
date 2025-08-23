@@ -1,6 +1,7 @@
 package fluent.freemarker.variable;
 
 import fluent.freemarker.model.TypeRegistry;
+import fluent.freemarker.validator.VariableValidationChain;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
@@ -25,20 +26,48 @@ public class FluentFreemarkerContext {
     private final Map<String, Object> context;
     private final VariableRegistry variableRegistry;
     private final TypeRegistry typeRegistry;
+    private final String currentSourceLocation; // 新增：当前源位置
+    private final VariableValidationChain variableValidationChain;
 
     // Private constructor for internal use
-    private FluentFreemarkerContext() {
+    private FluentFreemarkerContext(String currentSourceLocation, VariableValidationChain variableValidationChain) {
         this.context = new HashMap<>();
         this.variableRegistry = new VariableRegistry();
         this.typeRegistry = new TypeRegistry();
+        this.currentSourceLocation = currentSourceLocation != null ? currentSourceLocation : "unknown";
+        this.variableValidationChain = variableValidationChain;
+    }
+
+    // Private constructor for copying
+    private FluentFreemarkerContext(FluentFreemarkerContext other, String newSourceLocation, VariableValidationChain variableValidationChain) {
+        this.context = new HashMap<>(other.context);
+        this.variableRegistry = other.variableRegistry;
+        this.typeRegistry = other.typeRegistry;
+        this.currentSourceLocation = newSourceLocation != null ? newSourceLocation : other.currentSourceLocation;
+        this.variableValidationChain = variableValidationChain;
     }
 
     /**
      * Start building a new context.
      */
     public static FluentFreemarkerContext create() {
-        return new FluentFreemarkerContext();
+        return new FluentFreemarkerContext("unknown", VariableValidationChain.createDefaultChain());
     }
+
+    /**
+     * 设置当前源文件位置
+     */
+    public FluentFreemarkerContext at(String sourceLocation) {
+        return new FluentFreemarkerContext(this, sourceLocation, this.variableValidationChain);
+    }
+
+    /**
+     * 设置自定义验证器链
+     */
+    public FluentFreemarkerContext withValidationChain(VariableValidationChain validationChain) {
+        return new FluentFreemarkerContext(this, this.currentSourceLocation, validationChain);
+    }
+
 
     /**
      * Add a key-value pair to the context.
@@ -60,8 +89,6 @@ public class FluentFreemarkerContext {
         map.forEach(this::var);
         return this;
     }
-
-
 
     /**
      * Add only if value is non-null.
@@ -115,7 +142,6 @@ public class FluentFreemarkerContext {
         return Collections.unmodifiableMap(result);
     }
 
-
     private Object resolveValueByPath(VariablePath path) {
         List<String> segments = path.getSegments();
         if (segments.isEmpty()) return null;
@@ -168,11 +194,10 @@ public class FluentFreemarkerContext {
         return s.isEmpty() ? s : s.substring(0, 1).toUpperCase() + s.substring(1);
     }
 
-
-        /**
-         * Add a stream as a list to the context (collects stream safely).
-         * If stream is null, an empty list is used.
-         */
+    /**
+     * Add a stream as a list to the context (collects stream safely).
+     * If stream is null, an empty list is used.
+     */
     public FluentFreemarkerContext withCollection(String key, Stream<?> stream) {
         try {
             if (stream == null) {
@@ -191,13 +216,11 @@ public class FluentFreemarkerContext {
         return this;
     }
 
-
     public FluentFreemarkerContext withArray(String key, Object... array) {
         context.put(key, array != null ? Arrays.asList(array) : Collections.emptyList());
         log.trace("Added array as list with {} items for key '{}'", array == null ? 0 : array.length, key);
         return this;
     }
-
 
     /**
      * Add a filtered collection to the context.
@@ -241,7 +264,6 @@ public class FluentFreemarkerContext {
 
         return this;
     }
-
 
     /**
      * Add a sorted collection to the context.
@@ -330,7 +352,6 @@ public class FluentFreemarkerContext {
         return withSortedCollection(key, collection.stream(), comparator);
     }
 
-
     public <T, K> FluentFreemarkerContext withGroupedBy(
             String key,
             Stream<T> stream,
@@ -375,6 +396,9 @@ public class FluentFreemarkerContext {
 
     @Override
     public String toString() {
-        return "FluentContext{" + "context=" + context + '}';
+        return "FluentContext{" +
+                "context=" + context +
+                ", source='" + currentSourceLocation + '\'' +
+                '}';
     }
 }

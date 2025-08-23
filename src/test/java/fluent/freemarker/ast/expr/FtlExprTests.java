@@ -1,6 +1,5 @@
 package fluent.freemarker.ast.expr;
 
-import fluent.freemarker.builder.AstJson;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

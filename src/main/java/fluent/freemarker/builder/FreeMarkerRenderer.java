@@ -15,7 +15,9 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
     }
 
     public String render(List<FtlNode> nodes) {
-        for (FtlNode n : nodes) n.accept(this);
+        for (FtlNode n : nodes) {
+            n.accept(this);
+        }
         return sb.toString();
     }
 
@@ -229,5 +231,10 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
     @Override
     public void visit(SettingNode node) {
         append("<#setting " + node.key + " = " + node.value + ">");
+    }
+
+    @Override
+    public void visit(NewlineNode newlineNode) {
+        append("\n");
     }
 }

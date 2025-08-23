@@ -7,9 +7,21 @@ public class ValidationRecorder {
     private final Deque<LocalScope> scopeStack = new ArrayDeque<>();
     private final Set<String> globalAssignedVars = new HashSet<>();
     private final Map<String, Object> assignedValues = new HashMap<>();
+    private final Set<String> scopeVariables = new HashSet<>(); // 记录所有作用域变量
+
     // ====== 变量引用 ======
     public void record(VariableReference ref) {
         references.add(ref);
+    }
+
+
+    public void wrapCtx(FluentFreemarkerContext context) {
+        Map<String, Object> ctxMap = context.getContext();
+        if (ctxMap != null) {
+            for (Map.Entry<String, Object> entry : ctxMap.entrySet()) {
+                assign(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     public List<VariableReference> getReferences() {
@@ -38,6 +50,21 @@ public class ValidationRecorder {
             }
         }
         return null;
+    }
+
+    // 记录作用域变量
+    public void recordScopeVariable(String varName) {
+        scopeVariables.add(varName);
+    }
+
+    // 检查是否是作用域变量
+    public boolean isScopeVariable(String varName) {
+        return scopeVariables.contains(varName);
+    }
+
+    // 获取所有作用域变量（用于调试）
+    public Set<String> getScopeVariables() {
+        return new HashSet<>(scopeVariables);
     }
 
     // ====== assign 变量管理 ======
