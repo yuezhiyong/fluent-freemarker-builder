@@ -1,14 +1,22 @@
 package fluent.freemarker.variable;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 
 public class ValidationRecorder {
     private final List<VariableReference> references = new ArrayList<>();
     private final Deque<LocalScope> scopeStack = new ArrayDeque<>();
+    private final Set<String> globalAssignedVars = new HashSet<>();
+    private final Map<String, Object> assignedValues = new HashMap<>();
+    // ====== 变量引用 ======
+    public void record(VariableReference ref) {
+        references.add(ref);
+    }
 
+    public List<VariableReference> getReferences() {
+        return new ArrayList<>(references);
+    }
+
+    // ====== 作用域管理 ======
     public void pushScope(String localVar, String typeName) {
         scopeStack.push(new LocalScope(localVar, typeName));
     }
@@ -32,28 +40,70 @@ public class ValidationRecorder {
         return null;
     }
 
-    public void record(VariableReference ref) {
-        references.add(ref);
+    // ====== assign 变量管理 ======
+    public void assign(String varName, Object value) {
+        if (scopeStack.isEmpty()) {
+            globalAssignedVars.add(varName);
+            assignedValues.put(varName, value);  // 存储值
+        } else {
+            LocalScope scope = scopeStack.peek();
+            scope.assignedVars.add(varName);
+            scope.assignedValues.put(varName, value);
+        }
     }
 
-    public List<VariableReference> getReferences() {
-        return new ArrayList<>(references);
+    public Object getAssignedValue(String varName) {
+        // 从内层作用域向外查找
+        for (LocalScope scope : scopeStack) {
+            if (scope.assignedValues.containsKey(varName)) {
+                return scope.assignedValues.get(varName);
+            }
+        }
+        return assignedValues.get(varName);
     }
 
-    // 清除（可选）
-    public void clear() {
-        references.clear();
-        scopeStack.clear();
+    public boolean isAssigned(String varName) {
+        // 优先检查作用域内 assign
+        for (LocalScope scope : scopeStack) {
+            if (scope.assignedVars.contains(varName)) {
+                return true;
+            }
+        }
+        return globalAssignedVars.contains(varName);
     }
 
-    private static class LocalScope {
+    // ====== 内部类：局部作用域 ======
+    public static class LocalScope {
         final String varName;
         final String typeName;
+        final Set<String> assignedVars = new HashSet<>();
+        final Map<String, Object> assignedValues = new HashMap<>();  // 新增
 
-        LocalScope(String varName, String typeName) {
+        public LocalScope(String varName, String typeName) {
             this.varName = varName;
             this.typeName = typeName;
         }
+
+        @Override
+        public String toString() {
+            return "LocalScope{var='" + varName + "', type='" + typeName + "', assigned=" + assignedVars + "}";
+        }
     }
+
+    // ====== 工具方法 ======
+    public void clear() {
+        references.clear();
+        scopeStack.clear();
+        globalAssignedVars.clear();
+    }
+
+    public Set<String> getGlobalAssignedVars() {
+        return Collections.unmodifiableSet(globalAssignedVars);
+    }
+
+    public Deque<LocalScope> getScopeStack() {
+        return new ArrayDeque<>(scopeStack);
+    }
+
 
 }

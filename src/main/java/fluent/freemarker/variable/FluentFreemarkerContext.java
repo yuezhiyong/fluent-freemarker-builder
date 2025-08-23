@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -97,15 +99,80 @@ public class FluentFreemarkerContext {
 
     /**
      * Build and return the raw context map.
+     * Also expands registered paths (e.g., user.name) into flat keys.
      */
     public Map<String, Object> build() {
-        return new HashMap<>(context); // Return immutable copy
+        Map<String, Object> result = new HashMap<>(context); // 先复制已有
+        // 遍历所有注册的路径
+        for (VariablePath path : variableRegistry.getAllPaths()) {
+            String pathStr = path.toString();
+            if (result.containsKey(pathStr)) continue; // 已存在，跳过
+            Object value = resolveValueByPath(path);
+            if (value != null) {
+                result.put(pathStr, value);
+            }
+        }
+        return Collections.unmodifiableMap(result);
     }
 
-    /**
-     * Add a stream as a list to the context (collects stream safely).
-     * If stream is null, an empty list is used.
-     */
+
+    private Object resolveValueByPath(VariablePath path) {
+        List<String> segments = path.getSegments();
+        if (segments.isEmpty()) return null;
+        // 第一段是根变量
+        String first = segments.get(0);
+        Object current = context.get(first);
+        if (current == null) return null;
+
+        // 逐级访问
+        for (int i = 1; i < segments.size(); i++) {
+            String field = segments.get(i);
+            current = getProperty(current, field);
+            if (current == null) break;
+        }
+        return current;
+    }
+
+    private Object getProperty(Object bean, String fieldName) {
+        try {
+            // 尝试字段
+            Field field;
+            Class<?> clazz = bean.getClass();
+            try {
+                field = clazz.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(bean);
+            } catch (NoSuchFieldException e) {
+                // 尝试 getter
+            }
+
+            // 尝试 getter: getXXX 或 isXXX
+            String getterName = "get" + capitalize(fieldName);
+            try {
+                Method method = clazz.getMethod(getterName);
+                return method.invoke(bean);
+            } catch (NoSuchMethodException e2) {
+                if (fieldName.length() > 0) {
+                    String isGetter = "is" + capitalize(fieldName);
+                    Method method = clazz.getMethod(isGetter);
+                    return method.invoke(bean);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Cannot access property {} on {}", fieldName, bean.getClass(), e);
+        }
+        return null;
+    }
+
+    private String capitalize(String s) {
+        return s.isEmpty() ? s : s.substring(0, 1).toUpperCase() + s.substring(1);
+    }
+
+
+        /**
+         * Add a stream as a list to the context (collects stream safely).
+         * If stream is null, an empty list is used.
+         */
     public FluentFreemarkerContext withCollection(String key, Stream<?> stream) {
         try {
             if (stream == null) {

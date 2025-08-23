@@ -5,6 +5,7 @@ import fluent.freemarker.utils.FTLUtils;
 import java.util.function.Consumer;
 
 public class ConditionalBlock {
+
     private final TemplateBuilder parent;
 
     public ConditionalBlock(TemplateBuilder parent) {

@@ -21,12 +21,5 @@ public class TemplateFragment {
         return content.toString();
     }
 
-    // 可以缓存常用片段
-    public static TemplateFragment userCard() {
-        return FTL.fragment()
-                .append("<div class='user'>")
-                .append("Name: ").var("user.name").newline()
-                .append("Email: ").var("user.email")
-                .append("</div>");
-    }
+
 }

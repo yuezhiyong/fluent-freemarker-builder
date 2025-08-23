@@ -30,6 +30,8 @@ dependencies {
     implementation 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'  // 启用注解处理器
 
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+
     // 测试也需要
     testCompileOnly 'org.projectlombok:lombok:1.18.30'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'

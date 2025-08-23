@@ -15,8 +15,7 @@ public class ListBlock {
         this.itemVar = itemVar;
         this.itemType = itemType;
         // 开始 list
-        parent.appendRaw("<#list ").appendRaw(collection)
-                .appendRaw(" as ").appendRaw(itemVar).appendRaw(">\n");
+        parent.appendRaw("<#list ").appendRaw(collection).appendRaw(" as ").appendRaw(itemVar).appendRaw(">\n");
     }
 
     public ListBlock append(String text) {

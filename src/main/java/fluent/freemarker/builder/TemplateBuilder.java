@@ -55,7 +55,7 @@ public class TemplateBuilder {
         if (dotIndex > 0) {
             String root = varName.substring(0, dotIndex);
             String path = varName.substring(dotIndex + 1);
-            if (recorder.isInScope(root)) {
+            if (recorder.isInScope(path)) {
                 // 局部变量字段
                 String typeName = recorder.getScopeType(root);
                 recorder.record(new VariableReference(varName, true, typeName, "list-item"));
