@@ -35,10 +35,7 @@ public class TypeValidator extends AbstractVariableValidator {
         }
 
         // 如果类型名称为空或未定义，跳过检查
-        if (reference.getVarTypeName() == null || reference.getVarTypeName().equals("undefined") || reference.getVarTypeName().equals("object")) {
-            return true;
-        }
-        return false;
+        return reference.getVarTypeName() == null || reference.getVarTypeName().equals("undefined") || reference.getVarTypeName().equals("object");
     }
 
     @Override

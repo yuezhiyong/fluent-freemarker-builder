@@ -11,6 +11,7 @@ import fluent.freemarker.parser.ExpressionParser;
 import fluent.freemarker.parser.ExpressionParserFactory;
 import fluent.freemarker.type.VariableTypeDetectionUtils;
 import fluent.freemarker.type.VariableTypeInfo;
+import fluent.freemarker.utils.FTLUtils;
 import fluent.freemarker.utils.PathUtils;
 import fluent.freemarker.validator.ValidationContext;
 import fluent.freemarker.validator.VariableValidationChain;
@@ -110,7 +111,7 @@ public class FtlBuilder {
 
     public FtlBuilder var(String name) {
         // 只有在有上下文时才记录变量引用
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
             VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext);
             // 创建变量引用
@@ -122,6 +123,10 @@ public class FtlBuilder {
         return this;
     }
 
+
+    private boolean ctxRecordAware() {
+        return context != null && validationRecorder != null;
+    }
 
     public FtlBuilder assign(String varName, String valueExpr) {
         // 只有在有上下文时才记录变量赋值
@@ -139,7 +144,7 @@ public class FtlBuilder {
 
     public FtlBuilder ifElseBlock(String condition, Consumer<FtlBuilder> thenBody, Consumer<FtlBuilder> elseBody) {
         // 只有在有上下文时才记录条件变量引用
-        if (context != null && validationRecorder != null) {
+        if (context != null && validationRecorder != null && FTLUtils.shouldParseAsExpression(condition)) {
             // 解析条件表达式为表达式树
             FtlExpr conditionExpr = DEFAULT_EXPRESSION_PARSER.parse(condition);
             // 记录条件表达式中的变量引用
@@ -179,7 +184,7 @@ public class FtlBuilder {
      * 记录单个变量引用
      */
     private void recordVariableReference(String varName) {
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
             VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(varName), validationContext);
             VariableReference ref = new VariableReference(varName,
@@ -195,7 +200,7 @@ public class FtlBuilder {
     public FtlBuilder list(String item, String listExpr, Consumer<FtlBuilder> body) {
         FtlBuilder childBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
         // 只有在有上下文时才记录变量引用和管理作用域
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             String name = PathUtils.getRootVariable(listExpr);
             // 记录列表表达式变量引用
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
@@ -229,11 +234,10 @@ public class FtlBuilder {
 
     public FtlBuilder macro(String name, Map<String, String> params, Consumer<FtlBuilder> body) {
         FtlBuilder childBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
-
         // 只有在有上下文时才管理宏作用域
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             // 推入宏作用域
-            validationRecorder.pushScope(name, "macro");
+            validationRecorder.pushScope("macro", name);
             // 注册宏参数
             if (params != null) {
                 for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -252,11 +256,23 @@ public class FtlBuilder {
     }
 
     public FtlBuilder callMacro(String name, Map<String, FtlExpr> args) {
+        // 验证宏调用参数
+        if (ctxRecordAware() && args != null) {
+            for (Map.Entry<String, FtlExpr> entry : args.entrySet()) {
+                recordVariablesInExpression(entry.getValue());
+            }
+        }
         nodes.add(new MacroCallNode(name, args));
         return this;
     }
 
     public FtlBuilder include(String template, Map<String, FtlExpr> params) {
+        // 验证包含参数
+        if (ctxRecordAware() && params != null) {
+            for (Map.Entry<String, FtlExpr> entry : params.entrySet()) {
+                recordVariablesInExpression(entry.getValue());
+            }
+        }
         nodes.add(new IncludeNode(template, params));
         return this;
     }
@@ -275,6 +291,16 @@ public class FtlBuilder {
 
     public FtlBuilder escape(String expr, String asVar, Consumer<FtlBuilder> body) {
         FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
+
+        // 记录 escape 表达式中的变量引用
+        if (ctxRecordAware()) {
+            FtlExpr exprObj = DEFAULT_EXPRESSION_PARSER.parse(expr);
+            recordVariablesInExpression(exprObj);
+
+            // 在子作用域中定义 asVar 变量
+            validationRecorder.pushScope("escape", expr);
+            validationRecorder.defineVariable(asVar, new ScopeVariableMarker(expr));
+        }
         body.accept(b);
         nodes.add(new EscapeNode(expr, asVar, b.build()));
         return this;
@@ -308,6 +334,11 @@ public class FtlBuilder {
 
     public FtlBuilder switchBlock(String expr, Consumer<FtlBuilder> cases, Consumer<FtlBuilder> defaultBody) {
         FtlBuilder caseBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
+        // 记录 switch 表达式中的变量引用
+        if (ctxRecordAware()) {
+            FtlExpr exprObj = DEFAULT_EXPRESSION_PARSER.parse(expr);
+            recordVariablesInExpression(exprObj);
+        }
         cases.accept(caseBuilder);
         FtlBuilder defaultBuilder = null;
         if (defaultBody != null) {
@@ -327,6 +358,11 @@ public class FtlBuilder {
 
     public FtlBuilder caseBlock(String value, Consumer<FtlBuilder> body) {
         FtlBuilder b = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
+        // 记录 case 值中的变量引用（如果有的话）
+        if (ctxRecordAware() && FTLUtils.shouldParseAsExpression(value)) {
+            FtlExpr valueExpr = DEFAULT_EXPRESSION_PARSER.parse(value);
+            recordVariablesInExpression(valueExpr);
+        }
         body.accept(b);
         nodes.add(new CaseNode(Collections.singletonList(new LiteralExpr(value)), b.build()));
         return this;
@@ -343,11 +379,19 @@ public class FtlBuilder {
     }
 
     public FtlBuilder returnBlock(FtlExpr expr) {
+        // 记录 return 表达式中的变量引用
+        if (ctxRecordAware()) {
+            recordVariablesInExpression(expr);
+        }
         nodes.add(new ReturnNode(expr));
         return this;
     }
 
     public FtlBuilder stopBlock(FtlExpr message) {
+        // 记录 stop 表达式中的变量引用
+        if (ctxRecordAware()) {
+            recordVariablesInExpression(message);
+        }
         nodes.add(new StopNode(message));
         return this;
     }
@@ -367,16 +411,34 @@ public class FtlBuilder {
     }
 
     public FtlBuilder importBlock(String template, String namespaceVar) {
+        // 在当前作用域中定义命名空间变量
+        if (ctxRecordAware()) {
+            validationRecorder.defineVariable(namespaceVar, new ScopeVariableMarker("namespace"));
+        }
         nodes.add(new ImportNode(template, namespaceVar));
         return this;
     }
 
     public FtlBuilder visit(String nodeExpr, Map<String, FtlExpr> args) {
+        // 记录 visit 表达式中的变量引用
+        if (ctxRecordAware()) {
+            FtlExpr exprObj = DEFAULT_EXPRESSION_PARSER.parse(nodeExpr);
+            recordVariablesInExpression(exprObj);
+            if (args != null) {
+                for (Map.Entry<String, FtlExpr> entry : args.entrySet()) {
+                    recordVariablesInExpression(entry.getValue());
+                }
+            }
+        }
         nodes.add(new VisitNode(new IdentifierExpr(nodeExpr), args));
         return this;
     }
 
     public FtlBuilder recurse(FtlExpr expr) {
+        // 记录 recurse 表达式中的变量引用
+        if (ctxRecordAware()) {
+            recordVariablesInExpression(expr);
+        }
         nodes.add(new RecurseNode(expr));
         return this;
     }
@@ -395,9 +457,11 @@ public class FtlBuilder {
 
     public FtlBuilder local(String var, FtlExpr expr) {
         // 只有在有上下文时才记录局部变量赋值
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             // 记录局部变量赋值
             validationRecorder.defineVariable(var, expr);
+            // 记录表达式的变量引用
+            recordVariablesInExpression(expr);
         }
         nodes.add(new LocalNode(var, expr));
         return this;
@@ -405,15 +469,21 @@ public class FtlBuilder {
 
     public FtlBuilder global(String var, FtlExpr expr) {
         // 只有在有上下文时才记录全局变量赋值
-        if (context != null && validationRecorder != null) {
+        if (ctxRecordAware()) {
             // 记录全局变量赋值
             validationRecorder.defineVariable(var, expr);
+            // 记录表达式的变量引用
+            recordVariablesInExpression(expr);
         }
         nodes.add(new GlobalNode(var, expr));
         return this;
     }
 
     public FtlBuilder setting(String key, FtlExpr value) {
+        // 记录 setting 表达式中的变量引用
+        if (ctxRecordAware()) {
+            recordVariablesInExpression(value);
+        }
         nodes.add(new SettingNode(key, value));
         return this;
     }
@@ -421,7 +491,7 @@ public class FtlBuilder {
     // 构建方法
     public List<FtlNode> build() {
         // 只有在有上下文且是根构建器时才执行验证
-        if (context != null && isRootBuilder) {
+        if (ctxRecordAware()) {
             validate();
             cleanupScopes();
         }
@@ -431,7 +501,7 @@ public class FtlBuilder {
     private void cleanupScopes() {
         // 单独的清理作用域方法
         // 只有在有上下文且是根构建器时才清理
-        if (context != null && validationRecorder != null && isRootBuilder) {
+        if (ctxRecordAware() && isRootBuilder) {
             // 清理所有可能残留的作用域
             while (!validationRecorder.getScopeStack().isEmpty()) {
                 validationRecorder.popScope();
@@ -441,7 +511,7 @@ public class FtlBuilder {
 
     // 语义验证方法（只有在有上下文时才执行）
     private void validate() {
-        if (context == null || validationRecorder == null) {
+        if (!ctxRecordAware()) {
             return;
         }
         // 创建验证上下文

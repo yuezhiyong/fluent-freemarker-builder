@@ -80,6 +80,7 @@ public class SimpleExpressionParser extends AbstractExpressionParser{
 
     private boolean isValidVariableReference(String str) {
         if (str == null || str.isEmpty()) return false;
-        return str.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
+        // 允许点号分隔的变量名
+        return str.matches("^[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*$");
     }
 }

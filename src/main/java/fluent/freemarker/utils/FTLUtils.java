@@ -22,6 +22,38 @@ public class FTLUtils {
         return repeat(" ", times);
     }
 
+    /**
+     * 判断是否应该将值解析为表达式
+     */
+    public static boolean shouldParseAsExpression(String value) {
+        if (value == null || value.isEmpty()) return false;
+
+        String trimmed = value.trim().toLowerCase();
+
+        // 这些值不应该被解析为变量表达式
+        if ("default".equals(trimmed) ||
+                "true".equals(trimmed) ||
+                "false".equals(trimmed)) {
+            return false;
+        }
+
+        // 数字字面量
+        try {
+            Double.parseDouble(trimmed);
+            return false;
+        } catch (NumberFormatException e) {
+            // 继续检查
+        }
+
+        // 字符串字面量
+        if ((value.startsWith("'") && value.endsWith("'")) ||
+                (value.startsWith("\"") && value.endsWith("\""))) {
+            return false;
+        }
+
+        return true;
+    }
+
 
     /**
      * 计算当前路径与另一个路径的 Levenshtein 编辑距离

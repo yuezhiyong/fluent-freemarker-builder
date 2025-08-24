@@ -1,6 +1,8 @@
 package fluent.freemarker;
 
 import fluent.freemarker.ast.*;
+import fluent.freemarker.ast.expr.FtlExpr;
+import fluent.freemarker.ast.expr.IdentifierExpr;
 import fluent.freemarker.ast.expr.LiteralExpr;
 import fluent.freemarker.builder.FtlBuilder;
 import fluent.freemarker.exception.TemplateSyntaxException;
@@ -289,5 +291,109 @@ public class FtlBuilderTests {
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
         assertTrue(nodes.get(0) instanceof IfNode);
+    }
+
+
+    @Test
+    void testEscape() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder.escape("user.name", "escapedName", escapeBuilder ->
+                escapeBuilder.text("Escaped: ").var("escapedName")
+        );
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof EscapeNode);
+    }
+
+
+
+    @Test
+    void testImport() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder.importBlock("common.ftl", "common");
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof ImportNode);
+
+        // 验证命名空间变量被定义
+        ValidationRecorder recorder = builder.getValidationRecorder();
+        assertTrue(recorder.isDefined("common"));
+    }
+
+    @Test
+    void testVisit() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        Map<String, FtlExpr> args = new HashMap<>();
+        args.put("param", new LiteralExpr("value"));
+        builder.visit("user", args);
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof VisitNode);
+    }
+
+
+    @Test
+    void testRecurse() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        assertThrows(TemplateSyntaxException.class,()->{
+            builder.recurse(new IdentifierExpr("node"));
+            builder.build();
+        });
+    }
+
+
+    @Test
+    void testReturnAndStop() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder.returnBlock(new LiteralExpr("returnValue"));
+        builder.stopBlock(new LiteralExpr("Stop message"));
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(2, nodes.size());
+        assertTrue(nodes.get(0) instanceof ReturnNode);
+        assertTrue(nodes.get(1) instanceof StopNode);
+    }
+
+
+    @Test
+    void testSwitchCase() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder.switchBlock("user.age", switchBuilder -> {
+            switchBuilder.caseBlock("18", caseBuilder -> caseBuilder.text("Adult"));
+            switchBuilder.caseBlock("default", caseBuilder -> caseBuilder.text("Other"));
+        }, null);
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof SwitchNode);
+    }
+
+
+    @Test
+    void testMacroCall() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        Map<String, FtlExpr> args = new HashMap<>();
+        args.put("name", new IdentifierExpr("user.name"));
+        args.put("age", new LiteralExpr(25));
+        builder.callMacro("greet", args);
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof MacroCallNode);
+    }
+
+    @Test
+    void testInclude() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        Map<String, FtlExpr> params = new HashMap<>();
+        params.put("title", new LiteralExpr("My Title"));
+        builder.include("header.ftl", params);
+
+        List<FtlNode> nodes = builder.build();
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0) instanceof IncludeNode);
     }
 }
