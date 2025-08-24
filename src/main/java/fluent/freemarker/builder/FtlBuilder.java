@@ -1,11 +1,14 @@
 package fluent.freemarker.builder;
 
 import fluent.freemarker.ast.*;
+import fluent.freemarker.ast.expr.BinaryExpr;
 import fluent.freemarker.ast.expr.FtlExpr;
 import fluent.freemarker.ast.expr.IdentifierExpr;
 import fluent.freemarker.ast.expr.LiteralExpr;
 import fluent.freemarker.exception.TemplateSyntaxException;
 import fluent.freemarker.inference.TypeInferenceUtils;
+import fluent.freemarker.parser.ExpressionParser;
+import fluent.freemarker.parser.ExpressionParserFactory;
 import fluent.freemarker.type.VariableTypeDetectionUtils;
 import fluent.freemarker.type.VariableTypeInfo;
 import fluent.freemarker.utils.PathUtils;
@@ -32,6 +35,8 @@ public class FtlBuilder {
     private final boolean isRootBuilder;
     private String currentSourceLocation;
 
+    private static final ExpressionParser DEFAULT_EXPRESSION_PARSER =
+            ExpressionParserFactory.create(ExpressionParserFactory.ParserType.DEFAULT);
 
     // 私有构造函数
     private FtlBuilder(FluentFreemarkerContext context, ValidationRecorder validationRecorder, boolean isRootBuilder) {
@@ -135,11 +140,10 @@ public class FtlBuilder {
     public FtlBuilder ifElseBlock(String condition, Consumer<FtlBuilder> thenBody, Consumer<FtlBuilder> elseBody) {
         // 只有在有上下文时才记录条件变量引用
         if (context != null && validationRecorder != null) {
-            // 记录条件变量引用
-            ValidationContext validationContext = new ValidationContext(context, validationRecorder);
-            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(condition), validationContext);
-            VariableReference ref = new VariableReference(condition, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation());
-            validationRecorder.record(ref);
+            // 解析条件表达式为表达式树
+            FtlExpr conditionExpr = DEFAULT_EXPRESSION_PARSER.parse(condition);
+            // 记录条件表达式中的变量引用
+            recordVariablesInExpression(conditionExpr);
         }
 
         FtlBuilder thenBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
@@ -150,10 +154,43 @@ public class FtlBuilder {
             elseBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);
             elseBody.accept(elseBuilder);
         }
-
         nodes.add(new IfNode(condition, thenBuilder.build(), elseBuilder != null ? elseBuilder.build() : Collections.emptyList()));
         return this;
     }
+
+    /**
+     * 记录表达式中的变量引用
+     */
+    private void recordVariablesInExpression(FtlExpr expr) {
+        if (expr == null) return;
+        if (expr instanceof IdentifierExpr) {
+            String varName = ((IdentifierExpr) expr).getName();
+            // 记录变量引用用于验证
+            recordVariableReference(varName);
+        } else if (expr instanceof BinaryExpr) {
+            BinaryExpr binaryExpr = (BinaryExpr) expr;
+            // 递归记录左右子表达式中的变量
+            recordVariablesInExpression(binaryExpr.getLeft());
+            recordVariablesInExpression(binaryExpr.getRight());
+        }
+    }
+
+    /**
+     * 记录单个变量引用
+     */
+    private void recordVariableReference(String varName) {
+        if (context != null && validationRecorder != null) {
+            ValidationContext validationContext = new ValidationContext(context, validationRecorder);
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(varName), validationContext);
+            VariableReference ref = new VariableReference(varName,
+                    typeInfo.getVarType(),
+                    typeInfo.getTypeName(),
+                    typeInfo.getVariableKey(),
+                    getCurrentLocation());
+            validationRecorder.record(ref);
+        }
+    }
+
 
     public FtlBuilder list(String item, String listExpr, Consumer<FtlBuilder> body) {
         FtlBuilder childBuilder = context != null ? createChild(context, validationRecorder) : createChildWithoutContext(validationRecorder);

@@ -285,9 +285,7 @@ public class FtlBuilderTests {
     @Test
     void testNestedStructures() {
         FtlBuilder builder = FtlBuilder.create(context);
-
         builder.ifBlock("user.age > 18", ifBuilder -> ifBuilder.list("order", "orders", listBuilder -> listBuilder.ifBlock("order.amount > 50", nestedIfBuilder -> nestedIfBuilder.text("Large order\n"))));
-
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
         assertTrue(nodes.get(0) instanceof IfNode);
