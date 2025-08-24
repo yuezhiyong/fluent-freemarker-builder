@@ -1,27 +1,19 @@
 package fluent.freemarker.variable;
 
+import fluent.freemarker.model.VarType;
+import fluent.freemarker.type.VarKeyType;
+import lombok.Getter;
+
 import java.util.*;
 
 public class ValidationRecorder {
     private final List<VariableReference> references = new ArrayList<>();
-    private final Deque<LocalScope> scopeStack = new ArrayDeque<>();
-    private final Set<String> globalAssignedVars = new HashSet<>();
-    private final Map<String, Object> assignedValues = new HashMap<>();
-    private final Set<String> scopeVariables = new HashSet<>(); // 记录所有作用域变量
+    private final Deque<FreeScope> scopeStack = new ArrayDeque<>(); // 使用 FreeScope
+    private final Map<String, Object> globalVariables = new HashMap<>();
 
-    // ====== 变量引用 ======
+    // ====== 变量引用记录 ======
     public void record(VariableReference ref) {
         references.add(ref);
-    }
-
-
-    public void wrapCtx(FluentFreemarkerContext context) {
-        Map<String, Object> ctxMap = context.getContext();
-        if (ctxMap != null) {
-            for (Map.Entry<String, Object> entry : ctxMap.entrySet()) {
-                assign(entry.getKey(), entry.getValue());
-            }
-        }
     }
 
     public List<VariableReference> getReferences() {
@@ -29,110 +21,214 @@ public class ValidationRecorder {
     }
 
     // ====== 作用域管理 ======
-    public void pushScope(String localVar, String typeName) {
-        scopeStack.push(new LocalScope(localVar, typeName));
+
+    /**
+     * 推入新作用域
+     */
+    public void pushScope(String scopeType, String scopeName) {
+        scopeStack.push(new FreeScope(scopeType, scopeName));
     }
 
+    /**
+     * 推入默认作用域
+     */
+    public void pushScope() {
+        scopeStack.push(new FreeScope("unknown", "unnamed"));
+    }
+
+    /**
+     * 弹出作用域
+     */
     public void popScope() {
         if (!scopeStack.isEmpty()) {
             scopeStack.pop();
         }
     }
 
-    public boolean isInScope(String varName) {
-        return scopeStack.stream().anyMatch(s -> s.varName.equals(varName));
-    }
-
-    public String getScopeType(String varName) {
-        for (LocalScope scope : scopeStack) {
-            if (scope.varName.equals(varName)) {
-                return scope.typeName;
-            }
+    /**
+     * 在当前作用域中定义变量
+     */
+    public void defineVariable(String name, Object value) {
+        if (scopeStack.isEmpty()) {
+            // 如果没有作用域，定义为全局变量
+            globalVariables.put(name, value);
+        } else {
+            // 在当前作用域中定义
+            scopeStack.peek().defineVariable(name, value);
         }
-        return null;
-    }
-
-    // 记录作用域变量
-    public void recordScopeVariable(String varName) {
-        scopeVariables.add(varName);
-    }
-
-    // 检查是否是作用域变量
-    public boolean isScopeVariable(String varName) {
-        return scopeVariables.contains(varName);
-    }
-
-
-    public boolean isDefinedGlobally(String varName) {
-        return globalAssignedVars.contains(varName);
     }
 
     /**
-     * 检查变量是否在当前作用域中定义（非全局）
+     * 检查变量是否已定义（从内到外查找）
+     */
+    public boolean isDefined(String name) {
+        // 检查作用域（从内到外）
+        for (FreeScope scope : scopeStack) {
+            if (scope.containsVariable(name)) {
+                return true;
+            }
+        }
+        // 检查全局变量
+        return globalVariables.containsKey(name);
+    }
+
+    /**
+     * 获取变量值（从内到外查找）
+     */
+    public Object getValue(String name) {
+        // 检查作用域（从内到外）
+        for (FreeScope scope : scopeStack) {
+            if (scope.containsVariable(name)) {
+                return scope.getVariable(name);
+            }
+        }
+        // 检查全局变量
+        return globalVariables.get(name);
+    }
+
+    // ====== 特定作用域检查 ======
+
+    /**
+     * 检查变量是否在全局作用域中定义
+     */
+    public boolean isDefinedGlobally(String name) {
+        return globalVariables.containsKey(name);
+    }
+
+    /**
+     * 检查变量是否在局部作用域中定义
      */
     public boolean isDefinedInScope(String name) {
-        // 检查所有作用域（除了全局作用域）
-        for (LocalScope scope : scopeStack) {
-            if (scope.assignedVars.contains(name)) {
+        // 检查所有局部作用域
+        for (FreeScope scope : scopeStack) {
+            if (scope.containsVariable(name)) {
                 return true;
             }
         }
         return false;
     }
 
-    // 获取所有作用域变量（用于调试）
-    public Set<String> getScopeVariables() {
-        return new HashSet<>(scopeVariables);
+    /**
+     * 检查是否是特殊标记的变量（如作用域变量）
+     */
+    public boolean isMarkedVariable(String name) {
+        Object value = getValue(name);
+        return value instanceof ScopeVariableMarker;
     }
 
-    // ====== assign 变量管理 ======
-    public void assign(String varName, Object value) {
-        if (scopeStack.isEmpty()) {
-            globalAssignedVars.add(varName);
-            assignedValues.put(varName, value);  // 存储值
-        } else {
-            LocalScope scope = scopeStack.peek();
-            scope.assignedVars.add(varName);
-            scope.assignedValues.put(varName, value);
-        }
-    }
-
-    public Object getAssignedValue(String varName) {
-        // 从内层作用域向外查找
-        for (LocalScope scope : scopeStack) {
-            if (scope.assignedValues.containsKey(varName)) {
-                return scope.assignedValues.get(varName);
+    /**
+     * 检查是否是作用域变量
+     */
+    public boolean isScopeVariable(String name) {
+        // 检查所有作用域中的变量是否是 ScopeMarker
+        for (FreeScope scope : scopeStack) {
+            if (scope.containsVariable(name)) {
+                Object value = scope.getVariable(name);
+                return value instanceof ScopeVariableMarker;
             }
         }
-        return assignedValues.get(varName);
+        return false;
     }
 
-    public boolean isAssigned(String varName) {
-        // 优先检查作用域内 assign
-        for (LocalScope scope : scopeStack) {
-            if (scope.assignedVars.contains(varName)) {
-                return true;
+    /**
+     * 获取变量的作用域类型
+     */
+    public VarKeyType getVariableScopeType(String name) {
+        for (FreeScope scope : scopeStack) {
+            if (scope.containsVariable(name)) {
+                Object value = scope.getVariable(name);
+                if (value instanceof ScopeVariableMarker) {
+                    return VarKeyType.ofKeyType(name, ((ScopeVariableMarker) value).getType());
+                } else if (value != null) {
+                    return VarKeyType.ofKeyType(name, value.getClass().getSimpleName());
+                }
+                return VarKeyType.ofKeyType(name, "object");
             }
         }
-        return globalAssignedVars.contains(varName);
+        return VarKeyType.ofKeyType(name, VarType.UNDEFINED.name());
+    }
+
+    // ====== 上下文集成 ======
+    public void wrapContext(FluentFreemarkerContext context) {
+        if (context != null) {
+            Map<String, Object> ctxMap = context.getContext();
+            if (ctxMap != null) {
+                for (Map.Entry<String, Object> entry : ctxMap.entrySet()) {
+                    globalVariables.putIfAbsent(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+    }
+
+
+    public Set<String> getAllDefinedVariables() {
+        Set<String> all = new HashSet<>(globalVariables.keySet());
+        for (FreeScope scope : scopeStack) {
+            all.addAll(scope.getVariableNames());
+        }
+        return all;
+    }
+
+    public int getScopeDepth() {
+        return scopeStack.size();
     }
 
 
     // ====== 内部类：局部作用域 ======
-    public static class LocalScope {
-        final String varName;
-        final String typeName;
-        final Set<String> assignedVars = new HashSet<>();
-        final Map<String, Object> assignedValues = new HashMap<>();  // 新增
+    @Getter
+    public static class FreeScope {
+        private final Map<String, Object> variables = new HashMap<>();
+        private final String scopeType; // 作用域类型：list, macro, function, etc.
+        private final String scopeName; // 作用域名称（如列表变量名、宏名等）
 
-        public LocalScope(String varName, String typeName) {
-            this.varName = varName;
-            this.typeName = typeName;
+        public FreeScope(String scopeType, String scopeName) {
+            this.scopeType = scopeType != null ? scopeType : "unknown";
+            this.scopeName = scopeName != null ? scopeName : "unnamed";
         }
+
+        /**
+         * 在作用域中定义变量
+         */
+        public void defineVariable(String name, Object value) {
+            variables.put(name, value);
+        }
+
+        /**
+         * 检查变量是否在当前作用域中定义
+         */
+        public boolean containsVariable(String name) {
+            return variables.containsKey(name);
+        }
+
+        /**
+         * 获取作用域中的变量值
+         */
+        public Object getVariable(String name) {
+            return variables.get(name);
+        }
+
+        /**
+         * 获取作用域中所有变量名
+         */
+        public Set<String> getVariableNames() {
+            return new HashSet<>(variables.keySet());
+        }
+
+        /**
+         * 获取作用域中所有变量
+         */
+        public Map<String, Object> getVariables() {
+            return new HashMap<>(variables);
+        }
+
 
         @Override
         public String toString() {
-            return "LocalScope{var='" + varName + "', type='" + typeName + "', assigned=" + assignedVars + "}";
+            return "FreeScope{" +
+                    "type='" + scopeType + '\'' +
+                    ", name='" + scopeName + '\'' +
+                    ", variables=" + variables.size() +
+                    '}';
         }
     }
 
@@ -140,14 +236,14 @@ public class ValidationRecorder {
     public void clear() {
         references.clear();
         scopeStack.clear();
-        globalAssignedVars.clear();
+        globalVariables.clear();
     }
 
     public Set<String> getGlobalAssignedVars() {
-        return Collections.unmodifiableSet(globalAssignedVars);
+        return Collections.unmodifiableSet(globalVariables.keySet());
     }
 
-    public Deque<LocalScope> getScopeStack() {
+    public Deque<FreeScope> getScopeStack() {
         return new ArrayDeque<>(scopeStack);
     }
 

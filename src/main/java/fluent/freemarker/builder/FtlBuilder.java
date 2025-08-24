@@ -10,7 +10,6 @@ import fluent.freemarker.utils.PathUtils;
 import fluent.freemarker.validator.ValidationContext;
 import fluent.freemarker.validator.VariableValidationChain;
 import fluent.freemarker.variable.FluentFreemarkerContext;
-import fluent.freemarker.variable.ScopeVariableMarker;
 import fluent.freemarker.variable.ValidationRecorder;
 import fluent.freemarker.variable.VariableReference;
 import lombok.Getter;
@@ -43,7 +42,7 @@ public class FtlBuilder {
 
     private void initValidationRecorder() {
         if (validationRecorder != null && context != null) {
-            validationRecorder.wrapCtx(context);
+            validationRecorder.wrapContext(context);
         }
     }
 
@@ -105,9 +104,9 @@ public class FtlBuilder {
         // 只有在有上下文时才记录变量引用
         if (context != null && validationRecorder != null) {
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
-            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext, validationRecorder);
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext);
             // 创建变量引用
-            VariableReference ref = new VariableReference(name, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
+            VariableReference ref = new VariableReference(name, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation());
             // 记录变量引用用于后续验证
             validationRecorder.record(ref);
         }
@@ -120,7 +119,7 @@ public class FtlBuilder {
         // 只有在有上下文时才记录变量赋值
         if (context != null && validationRecorder != null) {
             // 记录变量赋值
-            validationRecorder.assign(varName, valueExpr);
+            validationRecorder.defineVariable(varName, valueExpr);
         }
         nodes.add(new AssignNode(varName, valueExpr));
         return this;
@@ -135,8 +134,8 @@ public class FtlBuilder {
         if (context != null && validationRecorder != null) {
             // 记录条件变量引用
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
-            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(condition), validationContext, validationRecorder);
-            VariableReference ref = new VariableReference(condition, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(PathUtils.getRootVariable(condition), validationContext);
+            VariableReference ref = new VariableReference(condition, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation());
             validationRecorder.record(ref);
         }
 
@@ -160,15 +159,13 @@ public class FtlBuilder {
             String name = PathUtils.getRootVariable(listExpr);
             // 记录列表表达式变量引用
             ValidationContext validationContext = new ValidationContext(context, validationRecorder);
-            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext, validationRecorder);
-            VariableReference listRef = new VariableReference(listExpr, typeInfo.getVarType(), typeInfo.getTypeName(), getCurrentLocation());
+            VariableTypeInfo typeInfo = VariableTypeDetectionUtils.detectVariableType(name, validationContext);
+            VariableReference listRef = new VariableReference(listExpr, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation());
             validationRecorder.record(listRef);
             // 推入新作用域
-            validationRecorder.pushScope(item, typeInfo.getTypeName());
-            // 推断列表项类型
+            validationRecorder.pushScope(typeInfo.getTypeName(), typeInfo.getVariableKey());
             // 在新作用域中定义列表项变量
-            validationRecorder.assign(item, new ScopeVariableMarker(typeInfo.getTypeName()));
-            validationRecorder.recordScopeVariable(item); // 记录这是一个作用域变量
+            validationRecorder.record(new VariableReference(item, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation())); // 记录这是一个作用域变量
         }
         body.accept(childBuilder);
         nodes.add(new ListNode(item, listExpr, childBuilder.build()));
@@ -185,8 +182,7 @@ public class FtlBuilder {
             // 注册宏参数
             if (params != null) {
                 for (Map.Entry<String, String> entry : params.entrySet()) {
-                    validationRecorder.assign(entry.getKey(), entry.getValue());
-                    validationRecorder.recordScopeVariable(entry.getKey());
+                    validationRecorder.defineVariable(entry.getKey(), entry.getValue());
                 }
             }
         }
@@ -346,7 +342,7 @@ public class FtlBuilder {
         // 只有在有上下文时才记录局部变量赋值
         if (context != null && validationRecorder != null) {
             // 记录局部变量赋值
-            validationRecorder.assign(var, expr);
+            validationRecorder.defineVariable(var, expr);
         }
         nodes.add(new LocalNode(var, expr));
         return this;
@@ -356,7 +352,7 @@ public class FtlBuilder {
         // 只有在有上下文时才记录全局变量赋值
         if (context != null && validationRecorder != null) {
             // 记录全局变量赋值
-            validationRecorder.assign(var, expr);
+            validationRecorder.defineVariable(var, expr);
         }
         nodes.add(new GlobalNode(var, expr));
         return this;

@@ -8,23 +8,37 @@ public class VariableTypeInfo {
 
     private final VarType varType;
     private final String typeName;
-    private final boolean shouldStopValidation; // 是否停止后续验证
+    private final String variableKey;        // 变量属性key（如 "user", "orders"）
 
-    public VariableTypeInfo(VarType variableType, String typeName) {
-        this(variableType, typeName, false);
-    }
-
-    public VariableTypeInfo(VarType variableType, String typeName, boolean shouldStopValidation) {
+    public VariableTypeInfo(VarType variableType, String typeName, String variableKey) {
         this.varType = variableType;
         this.typeName = typeName;
-        this.shouldStopValidation = shouldStopValidation;
+        this.variableKey = variableKey;
+    }
+
+    public VariableTypeInfo(VarType variableType, String typeName) {
+        this(variableType, typeName, null);
+    }
+
+    public static VariableTypeInfo of(VarType type, String typeName, String variableKey) {
+        return new VariableTypeInfo(type, typeName, variableKey);
     }
 
     public static VariableTypeInfo of(VarType type, String typeName) {
-        return new VariableTypeInfo(type, typeName);
+        return new VariableTypeInfo(type, typeName, null);
     }
 
-    public static VariableTypeInfo stop(VarType type, String typeName) {
-        return new VariableTypeInfo(type, typeName, true);
+    // 便捷方法
+    public boolean hasVariableKey() {
+        return variableKey != null && !variableKey.isEmpty();
+    }
+
+    @Override
+    public String toString() {
+        return "VariableTypeInfo{" +
+                "varType=" + varType +
+                ", typeName='" + typeName + '\'' +
+                ", variableKey='" + variableKey + '\'' +
+                '}';
     }
 }

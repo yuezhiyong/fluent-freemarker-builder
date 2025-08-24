@@ -2,7 +2,6 @@ package fluent.freemarker.type;
 
 import fluent.freemarker.model.VarType;
 import fluent.freemarker.validator.ValidationContext;
-import fluent.freemarker.variable.ValidationRecorder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,10 +18,9 @@ public class VariableTypeDetectionChain {
         return this;
     }
 
-    public VariableTypeInfo detectType(String variableName, String expression,
-                                       ValidationContext context, ValidationRecorder recorder) {
+    public VariableTypeInfo detectType(String variableName, String expression, ValidationContext context) {
         for (VariableTypeDetector detector : detectors) {
-            VariableTypeInfo typeInfo = detector.detectType(variableName, expression, context, recorder);
+            VariableTypeInfo typeInfo = detector.detectType(variableName, expression, context);
             if (typeInfo != null) {
                 return typeInfo;
             }

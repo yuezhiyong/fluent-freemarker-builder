@@ -103,7 +103,7 @@ public class FtlBuilderTests {
 
         // 验证变量赋值被记录
         ValidationRecorder recorder = builder.getValidationRecorder();
-        assertTrue(recorder.isAssigned("count"));
+        assertTrue(recorder.isDefined("count"));
     }
 
     @Test
@@ -185,8 +185,8 @@ public class FtlBuilderTests {
         assertTrue(nodes.get(1) instanceof GlobalNode);
 
         ValidationRecorder recorder = builder.getValidationRecorder();
-        assertTrue(recorder.isAssigned("temp"));
-        assertTrue(recorder.isAssigned("globalVar"));
+        assertTrue(recorder.isDefined("temp"));
+        assertTrue(recorder.isDefined("globalVar"));
     }
 
     @Test
@@ -202,7 +202,6 @@ public class FtlBuilderTests {
     @Test
     void testComplexTemplate() {
         FtlBuilder builder = FtlBuilder.create(context);
-
         builder
                 .text("User: ")
                 .var("user.name")
@@ -231,7 +230,7 @@ public class FtlBuilderTests {
         assertFalse(refs.isEmpty());
 
         // 验证变量赋值
-        assertTrue(recorder.isAssigned("total"));
+        assertTrue(recorder.isDefined("total"));
     }
 
     @Test
@@ -250,7 +249,7 @@ public class FtlBuilderTests {
         assertEquals("undefinedVar", refs.get(0).getExpression());
 
         // 验证未定义变量检测（会输出警告但不会抛异常）
-        assertFalse(recorder.isAssigned("undefinedVar"));
+        assertFalse(recorder.isDefined("undefinedVar"));
     }
 
     @Test
@@ -270,7 +269,7 @@ public class FtlBuilderTests {
 
         // 验证作用域管理
         ValidationRecorder recorder = builder.getValidationRecorder();
-        assertTrue(recorder.isAssigned("itemIndex")); // 全局 assign 应该被记录
+        assertTrue(recorder.isDefined("itemIndex")); // 全局 assign 应该被记录
     }
 
     @Test
@@ -293,7 +292,6 @@ public class FtlBuilderTests {
         FtlBuilder builder = FtlBuilder.create(context);
         List<FtlNode> nodes = builder.build();
         assertEquals(0, nodes.size());
-
         ValidationRecorder recorder = builder.getValidationRecorder();
         assertEquals(0, recorder.getReferences().size());
     }

@@ -23,12 +23,12 @@ public class ScopeVariableValidator extends AbstractVariableValidator {
         String rootVar = getRootVariable(reference.getExpression());
         ValidationRecorder recorder = context.getValidationRecorder();
         // 检查是否是作用域变量（即使作用域已结束，但变量在引用时是有效的）
-        if (recorder.isInScope(rootVar)) {
+        if (recorder.isDefinedInScope(rootVar)) {
             return ValidationResult.valid();
         }
         // 检查是否在当前或父作用域中被赋值
-        if (recorder.isAssigned(rootVar)) {
-            Object value = recorder.getAssignedValue(rootVar);
+        if (recorder.isDefined(rootVar)) {
+            Object value = recorder.getValue(rootVar);
             if (isScopeVariable(value)) {
                 return ValidationResult.valid();
             }

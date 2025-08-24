@@ -8,17 +8,25 @@ public class VariableReference {
     private final String expression;     // 如 "user.name" 或 "o.id"
     private final VarType varType;   // 如果是局部变量，它的类型（如 "Order"）
     private final String varTypeName;
+    private final String varKey;
     private final String source;         // 来源（调试用）
 
-    public VariableReference(String expression, VarType varType, String varTypeName, String source) {
+    public VariableReference(String expression, VarType varType, String varTypeName, String varKey, String source) {
         this.expression = expression;
         this.varType = varType;
         this.varTypeName = varTypeName;
+        this.varKey = varKey;
         this.source = source;
     }
 
     @Override
     public String toString() {
-        return "VariableReference{" + "expression='" + expression + '\'' + ", varType=" + varType + ", varTypeName='" + varTypeName + '\'' + ", source='" + source + '\'' + '}';
+        return "VariableReference{" +
+                "expression='" + expression + '\'' +
+                ", varType=" + varType +
+                ", varTypeName='" + varTypeName + '\'' +
+                ", varKey='" + varKey + '\'' +
+                ", source='" + source + '\'' +
+                '}';
     }
 }

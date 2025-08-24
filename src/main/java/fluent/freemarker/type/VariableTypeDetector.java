@@ -1,7 +1,6 @@
 package fluent.freemarker.type;
 
 import fluent.freemarker.validator.ValidationContext;
-import fluent.freemarker.variable.ValidationRecorder;
 
 public interface VariableTypeDetector {
     /**
@@ -10,17 +9,14 @@ public interface VariableTypeDetector {
      * @param variableName 变量名（根变量名）
      * @param expression   完整表达式
      * @param context      验证上下文
-     * @param recorder     验证记录器
      * @return 变量类型信息
      */
-    VariableTypeInfo detectType(String variableName, String expression,
-                                ValidationContext context, ValidationRecorder recorder);
+    VariableTypeInfo detectType(String variableName, String expression, ValidationContext context);
 
     /**
      * 是否应该跳过此检测器
      */
-    default boolean shouldSkip(String variableName, String expression,
-                               ValidationContext context, ValidationRecorder recorder) {
+    default boolean shouldSkip(String variableName, String expression, ValidationContext context) {
         return false;
     }
 }
