@@ -1,5 +1,6 @@
 package fluent.freemarker.model;
 
+import fluent.freemarker.registry.TypeRegistry;
 import lombok.Getter;
 
 import java.beans.Introspector;
@@ -20,6 +21,8 @@ public class TypeInfo {
         this.registry = registry;
         discoverFields();
     }
+
+
 
     private void discoverFields() {
         // === 基础类型、包装类、String、集合等，不再深入 ===

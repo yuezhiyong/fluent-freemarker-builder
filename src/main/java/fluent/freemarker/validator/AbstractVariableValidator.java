@@ -20,10 +20,7 @@ public abstract class AbstractVariableValidator implements VariableValidator {
     @Override
     public boolean skipValidate(VariableReference reference, ValidationContext context) {
         // 如果上下文为空，跳过验证
-        if (context == null || context.getFreemarkerContext() == null) {
-            return true;
-        }
-        return false;
+        return context == null || context.getFreemarkerContext() == null;
     }
 
 

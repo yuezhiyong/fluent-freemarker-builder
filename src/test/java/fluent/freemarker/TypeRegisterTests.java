@@ -1,7 +1,8 @@
 package fluent.freemarker;
 
 import fluent.freemarker.model.OrderPlus;
-import fluent.freemarker.model.TypeRegistry;
+import fluent.freemarker.registry.TypeRegistry;
+import fluent.freemarker.registry.TypeRegistryFactory;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -14,7 +15,7 @@ public class TypeRegisterTests {
 
     @Test
     public void testRegisterTypes() {
-        TypeRegistry typeRegistry = new TypeRegistry();
+        TypeRegistry typeRegistry = TypeRegistryFactory.create(TypeRegistryFactory.TypeRegistryType.DEFAULT);
         typeRegistry.register("Order", OrderPlus.class);
 
         // ✅ 深层路径检查

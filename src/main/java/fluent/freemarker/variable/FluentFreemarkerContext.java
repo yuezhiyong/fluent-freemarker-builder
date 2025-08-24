@@ -1,6 +1,8 @@
 package fluent.freemarker.variable;
 
-import fluent.freemarker.model.TypeRegistry;
+import fluent.freemarker.registrar.DefaultTypeRegistrar;
+import fluent.freemarker.registry.TypeRegistry;
+import fluent.freemarker.registry.TypeRegistryFactory;
 import fluent.freemarker.validator.VariableValidationChain;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -33,7 +35,8 @@ public class FluentFreemarkerContext {
     private FluentFreemarkerContext(String currentSourceLocation, VariableValidationChain variableValidationChain) {
         this.context = new HashMap<>();
         this.variableRegistry = new VariableRegistry();
-        this.typeRegistry = new TypeRegistry();
+        this.typeRegistry = TypeRegistryFactory.create(TypeRegistryFactory.TypeRegistryType.DEFAULT);
+        ;
         this.currentSourceLocation = currentSourceLocation != null ? currentSourceLocation : "unknown";
         this.variableValidationChain = variableValidationChain;
     }
@@ -74,20 +77,74 @@ public class FluentFreemarkerContext {
      */
     public FluentFreemarkerContext with(String key, Object value) {
         context.put(key, value);
+        registerTypeIfNeeded(key, value);
         return this;
     }
 
     public FluentFreemarkerContext var(String path, Object value) {
         context.put(path, value);
         getVariableRegistry().register(path);
+        registerTypeIfNeeded(path, value); // 自动注册类型
         log.trace("Registered variable path: {}", path);
         return this;
     }
 
     // 批量注册
     public FluentFreemarkerContext vars(Map<String, Object> map) {
-        map.forEach(this::var);
+        map.forEach((key, value) -> {
+            context.put(key, value);
+            registerTypeIfNeeded(key, value);
+        });
+        map.keySet().forEach(variableRegistry::register);
         return this;
+    }
+
+    /**
+     * 自动注册类型到 TypeRegistry
+     */
+    private void registerTypeIfNeeded(String varName, Object value) {
+        new DefaultTypeRegistrar().registerTypeIfNeeded(varName, value, this.typeRegistry);
+    }
+
+
+    /**
+     * 注册对象类型到 TypeRegistry
+     */
+    private void registerObjectType(Object obj) {
+        if (obj == null) return;
+
+        Class<?> clazz = obj.getClass();
+
+        // 避免重复注册基础类型
+        if (isPrimitiveOrWrapper(clazz) || clazz == String.class) {
+            return;
+        }
+
+        // 检查是否已经注册
+        try {
+            // 尝试获取已存在的 TypeInfo
+            // 如果 TypeRegistry 有缓存机制，这会避免重复注册
+        } catch (Exception e) {
+            // 忽略
+        }
+
+        // TypeRegistry 会在 getTypeInfo 时自动注册类型
+        try {
+            typeRegistry.getTypeInfo(clazz);
+        } catch (Exception e) {
+            log.debug("Failed to register type '{}': {}", clazz.getSimpleName(), e.getMessage());
+        }
+    }
+
+    /**
+     * 检查是否是基础类型或包装类型
+     */
+    private boolean isPrimitiveOrWrapper(Class<?> c) {
+        return c.isPrimitive() ||
+                c == Boolean.class || c == Character.class ||
+                c == Integer.class || c == Long.class || c == Short.class ||
+                c == Byte.class || c == Float.class || c == Double.class ||
+                c == Void.class;
     }
 
     /**

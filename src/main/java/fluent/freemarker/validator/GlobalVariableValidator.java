@@ -17,6 +17,9 @@ public class GlobalVariableValidator extends AbstractVariableValidator {
             // 作用域变量不应该在这里验证，让 ScopeVariableValidator 处理
             return ValidationResult.valid(); // 或者返回 invalid(null) 让下一个处理
         }
+        if(recorder != null && recorder.isDefined(rootVar)){
+            return ValidationResult.valid();
+        }
         // 检查全局变量
         if (context.getFreemarkerContext().getVariableRegistry().knows(rootVar)) {
             return ValidationResult.valid();

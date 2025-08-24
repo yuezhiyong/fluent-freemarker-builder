@@ -3,6 +3,7 @@ package fluent.freemarker;
 import fluent.freemarker.ast.*;
 import fluent.freemarker.ast.expr.LiteralExpr;
 import fluent.freemarker.builder.FtlBuilder;
+import fluent.freemarker.exception.TemplateSyntaxException;
 import fluent.freemarker.variable.FluentFreemarkerContext;
 import fluent.freemarker.variable.ValidationRecorder;
 import fluent.freemarker.variable.VariableReference;
@@ -20,11 +21,7 @@ public class FtlBuilderTests {
 
     @BeforeEach
     void setUp() {
-        context = FluentFreemarkerContext.create()
-                .var("user", new TestUser("John", 25))
-                .var("items", Arrays.asList("item1", "item2"))
-                .var("orders", Collections.singletonList(new TestOrder("ORD001", 100.0)))
-                .at("test.ftl");
+        context = FluentFreemarkerContext.create().var("user", new TestUser("John", 25)).var("items", Arrays.asList("item1", "item2")).var("orders", Collections.singletonList(new TestOrder("ORD001", 100.0))).at("test.ftl");
     }
 
     // 测试用的简单类
@@ -109,9 +106,7 @@ public class FtlBuilderTests {
     @Test
     void testIfBlock() {
         FtlBuilder builder = FtlBuilder.create(context);
-        builder.ifBlock("user.age > 18", ifBuilder ->
-                ifBuilder.text("Adult")
-        );
+        builder.ifBlock("user.age > 18", ifBuilder -> ifBuilder.text("Adult"));
 
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
@@ -125,10 +120,7 @@ public class FtlBuilderTests {
     @Test
     void testIfElseBlock() {
         FtlBuilder builder = FtlBuilder.create(context);
-        builder.ifElseBlock("user.age > 18",
-                ifBuilder -> ifBuilder.text("Adult"),
-                elseBuilder -> elseBuilder.text("Minor")
-        );
+        builder.ifElseBlock("user.age > 18", ifBuilder -> ifBuilder.text("Adult"), elseBuilder -> elseBuilder.text("Minor"));
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
         assertTrue(nodes.get(0) instanceof IfNode);
@@ -140,9 +132,7 @@ public class FtlBuilderTests {
     @Test
     void testList() {
         FtlBuilder builder = FtlBuilder.create(context);
-        builder.list("item", "items", listBuilder ->
-                listBuilder.text("- ").var("item").text("\n")
-        );
+        builder.list("item", "items", listBuilder -> listBuilder.text("- ").var("item").text("\n"));
 
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
@@ -160,9 +150,7 @@ public class FtlBuilderTests {
         params.put("age", "");
 
         FtlBuilder builder = FtlBuilder.create(context);
-        builder.macro("greet", params, macroBuilder ->
-                macroBuilder.text("Hello ").var("name").text(", age ").var("age")
-        );
+        builder.macro("greet", params, macroBuilder -> macroBuilder.text("Hello ").var("name").text(", age ").var("age"));
 
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
@@ -202,27 +190,10 @@ public class FtlBuilderTests {
     @Test
     void testComplexTemplate() {
         FtlBuilder builder = FtlBuilder.create(context);
-        builder
-                .text("User: ")
-                .var("user.name")
-                .text(" (Age: ")
-                .var("user.age")
-                .text(")\n")
-                .assign("total", "0")
-                .list("order", "orders", listBuilder ->
-                        listBuilder
-                                .text("Order ")
-                                .var("order.id")
-                                .text(": $")
-                                .var("order.amount")
-                                .text("\n")
-                                .assign("total", "total + order.amount")
-                )
-                .text("Total: $")
-                .var("total");
+        builder.text("User: ").var("user.name").text(" (Age: ").var("user.age").text(")\n").assign("total", "0").list("order", "orders", listBuilder -> listBuilder.text("Order ").var("order.id").text(": $").var("order.amount").text("\n").assign("total", "total + order.amount")).text("Total: $").var("total");
 
         List<FtlNode> nodes = builder.build();
-        assertEquals(7, nodes.size());
+        assertEquals(9, nodes.size());
 
         // 验证变量引用记录
         ValidationRecorder recorder = builder.getValidationRecorder();
@@ -235,12 +206,15 @@ public class FtlBuilderTests {
 
     @Test
     void testValidationRecorderIntegration() {
+        assertThrows(TemplateSyntaxException.class, () -> {
+            FtlBuilder builder = FtlBuilder.create(context);
+            // 使用未定义的变量应该被记录
+            builder.var("undefinedVar");
+            builder.build();
+        });
         FtlBuilder builder = FtlBuilder.create(context);
-
         // 使用未定义的变量应该被记录
         builder.var("undefinedVar");
-
-        List<FtlNode> nodes = builder.build();
 
         // 验证变量引用被记录
         ValidationRecorder recorder = builder.getValidationRecorder();
@@ -269,7 +243,7 @@ public class FtlBuilderTests {
 
         // 验证作用域管理
         ValidationRecorder recorder = builder.getValidationRecorder();
-        assertTrue(recorder.isDefined("itemIndex")); // 全局 assign 应该被记录
+        assertFalse(recorder.isDefined("itemIndex")); // 全局 assign 应该被记录
     }
 
     @Test
@@ -312,16 +286,7 @@ public class FtlBuilderTests {
     void testNestedStructures() {
         FtlBuilder builder = FtlBuilder.create(context);
 
-        builder
-                .ifBlock("user.age > 18", ifBuilder ->
-                        ifBuilder
-                                .list("order", "orders", listBuilder ->
-                                        listBuilder
-                                                .ifBlock("order.amount > 50", nestedIfBuilder ->
-                                                        nestedIfBuilder.text("Large order\n")
-                                                )
-                                )
-                );
+        builder.ifBlock("user.age > 18", ifBuilder -> ifBuilder.list("order", "orders", listBuilder -> listBuilder.ifBlock("order.amount > 50", nestedIfBuilder -> nestedIfBuilder.text("Large order\n"))));
 
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());

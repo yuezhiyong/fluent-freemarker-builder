@@ -4,12 +4,15 @@ import fluent.freemarker.ast.*;
 import fluent.freemarker.ast.expr.FtlExpr;
 import fluent.freemarker.ast.expr.IdentifierExpr;
 import fluent.freemarker.ast.expr.LiteralExpr;
+import fluent.freemarker.exception.TemplateSyntaxException;
+import fluent.freemarker.inference.TypeInferenceUtils;
 import fluent.freemarker.type.VariableTypeDetectionUtils;
 import fluent.freemarker.type.VariableTypeInfo;
 import fluent.freemarker.utils.PathUtils;
 import fluent.freemarker.validator.ValidationContext;
 import fluent.freemarker.validator.VariableValidationChain;
 import fluent.freemarker.variable.FluentFreemarkerContext;
+import fluent.freemarker.variable.ScopeVariableMarker;
 import fluent.freemarker.variable.ValidationRecorder;
 import fluent.freemarker.variable.VariableReference;
 import lombok.Getter;
@@ -165,11 +168,26 @@ public class FtlBuilder {
             // 推入新作用域
             validationRecorder.pushScope(typeInfo.getTypeName(), typeInfo.getVariableKey());
             // 在新作用域中定义列表项变量
-            validationRecorder.record(new VariableReference(item, typeInfo.getVarType(), typeInfo.getTypeName(), typeInfo.getVariableKey(), getCurrentLocation())); // 记录这是一个作用域变量
+
+            // 推断列表项类型名称
+            String itemTypeName = inferListItemTypeName(listExpr, typeInfo, validationContext);
+            // 在循环作用域中定义列表项变量
+            validationRecorder.defineVariable(item, new ScopeVariableMarker(itemTypeName));
         }
         body.accept(childBuilder);
         nodes.add(new ListNode(item, listExpr, childBuilder.build()));
         return this;
+    }
+
+    private String inferListItemTypeName(String listVarName, VariableTypeInfo listVariableTypeInfo, ValidationContext context) {
+        // 使用类型名称提取器来推断
+        String listTypeName = listVariableTypeInfo.getTypeName();
+        String extractedType = TypeInferenceUtils.extractElementTypeName(listTypeName);
+        if (!"object".equals(extractedType)) {
+            return extractedType;
+        }
+        // 回退到从实际值推断
+        return TypeInferenceUtils.inferSingularForm(listVarName);
     }
 
     public FtlBuilder macro(String name, Map<String, String> params, Consumer<FtlBuilder> body) {
@@ -407,7 +425,7 @@ public class FtlBuilder {
             for (int i = 0; i < allErrors.size(); i++) {
                 sb.append("  ").append(i + 1).append(". ").append(allErrors.get(i)).append("\n");
             }
-            throw new IllegalStateException(sb.toString());
+            throw new TemplateSyntaxException(sb.toString());
         }
 
     }
