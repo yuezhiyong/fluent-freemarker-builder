@@ -3,9 +3,11 @@ package fluent.freemarker.ast;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import fluent.freemarker.ast.expr.FtlExpr;
+import lombok.Getter;
 
 import java.util.List;
 
+@Getter
 public class CaseNode implements FtlNode {
 
     public final List<FtlExpr> values;

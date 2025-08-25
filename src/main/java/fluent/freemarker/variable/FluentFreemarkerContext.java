@@ -36,7 +36,6 @@ public class FluentFreemarkerContext {
         this.context = new HashMap<>();
         this.variableRegistry = new VariableRegistry();
         this.typeRegistry = TypeRegistryFactory.create(TypeRegistryFactory.TypeRegistryType.DEFAULT);
-        ;
         this.currentSourceLocation = currentSourceLocation != null ? currentSourceLocation : "unknown";
         this.variableValidationChain = variableValidationChain;
     }

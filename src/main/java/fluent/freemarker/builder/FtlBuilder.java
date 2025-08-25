@@ -36,6 +36,8 @@ public class FtlBuilder {
     private final boolean isRootBuilder;
     private String currentSourceLocation;
 
+    private static final FreeMarkerRenderer DEFAULT_RENDERER = new FreeMarkerRenderer();
+
     private static final ExpressionParser DEFAULT_EXPRESSION_PARSER =
             ExpressionParserFactory.create(ExpressionParserFactory.ParserType.DEFAULT);
 
@@ -535,5 +537,82 @@ public class FtlBuilder {
             throw new TemplateSyntaxException(sb.toString());
         }
 
+    }
+
+
+    // 在 FtlBuilder 类中添加更多文本便利方法
+    public FtlBuilder newline() {
+        nodes.add(new TextNode("\n"));
+        return this;
+    }
+
+    public FtlBuilder newlines(int count) {
+        if (count <= 0) return this;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append("\n");
+        }
+        nodes.add(new TextNode(sb.toString()));
+        return this;
+    }
+
+    public FtlBuilder space() {
+        nodes.add(new TextNode(" "));
+        return this;
+    }
+
+    public FtlBuilder spaces(int count) {
+        if (count <= 0) return this;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append(" ");
+        }
+        nodes.add(new TextNode(sb.toString()));
+        return this;
+    }
+
+    public FtlBuilder tab() {
+        nodes.add(new TextNode("\t"));
+        return this;
+    }
+
+    public FtlBuilder tabs(int count) {
+        if (count <= 0) return this;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append("\t");
+        }
+        nodes.add(new TextNode(sb.toString()));
+        return this;
+    }
+
+
+    /**
+     * 将构建的节点渲染为 FreeMarker 模板字符串
+     */
+    public String renderToString() {
+        List<FtlNode> nodes = build();
+        return DEFAULT_RENDERER.render(nodes);
+    }
+
+    /**
+     * 获取渲染器实例
+     */
+    public static FreeMarkerRenderer getRenderer() {
+        return DEFAULT_RENDERER;
+    }
+
+    /**
+     * 使用自定义渲染器渲染
+     */
+    public String renderToString(FreeMarkerRenderer renderer) {
+        if (renderer == null) {
+            return renderToString();
+        }
+        List<FtlNode> nodes = build();
+        return renderer.render(nodes);
     }
 }

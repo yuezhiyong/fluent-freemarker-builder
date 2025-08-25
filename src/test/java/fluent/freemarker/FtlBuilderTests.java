@@ -307,7 +307,6 @@ public class FtlBuilderTests {
     }
 
 
-
     @Test
     void testImport() {
         FtlBuilder builder = FtlBuilder.create(context);
@@ -338,7 +337,7 @@ public class FtlBuilderTests {
     @Test
     void testRecurse() {
         FtlBuilder builder = FtlBuilder.create(context);
-        assertThrows(TemplateSyntaxException.class,()->{
+        assertThrows(TemplateSyntaxException.class, () -> {
             builder.recurse(new IdentifierExpr("node"));
             builder.build();
         });
@@ -395,5 +394,56 @@ public class FtlBuilderTests {
         List<FtlNode> nodes = builder.build();
         assertEquals(1, nodes.size());
         assertTrue(nodes.get(0) instanceof IncludeNode);
+    }
+
+
+    @Test
+    void testRenderToString() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder
+                .text("Hello ")
+                .var("user.name")
+                .text("!")
+                .newline()
+                .assign("total", "0")
+                .list("order", "orders", listBuilder ->
+                        listBuilder
+                                .text("Order ")
+                                .var("order.id")
+                                .text(": $")
+                                .var("order.amount")
+                                .text("\n")
+                )
+                .text("Total: $")
+                .var("total");
+
+        String templateString = builder.renderToString();
+        System.out.println("Generated template:");
+        System.out.println(templateString);
+
+        // 验证生成的模板包含预期的内容
+        assertTrue(templateString.contains("Hello ${user.name}!"));
+        assertTrue(templateString.contains("<#list orders as order>"));
+        assertTrue(templateString.contains("${order.id}"));
+        assertTrue(templateString.contains("${order.amount}"));
+        assertTrue(templateString.contains("<#assign total = 0>"));
+    }
+
+    @Test
+    void testComplexTemplateRender() {
+        FtlBuilder builder = FtlBuilder.create(context);
+        builder
+                .ifElseBlock("user.age > 18", ifBuilder ->
+                                ifBuilder.text("Adult user: ").var("user.name")
+                        , elseBuilder ->
+                                elseBuilder.text("Minor user: ").var("user.name")
+                );
+        String templateString = builder.renderToString();
+        System.out.println("Complex template:");
+        System.out.println(templateString);
+        assertTrue(templateString.contains("<#if user.age > 18>"));
+        assertTrue(templateString.contains("<#else>"));
+        assertTrue(templateString.contains("</#if>"));
+        assertTrue(templateString.contains("Adult user: ${user.name}"));
     }
 }

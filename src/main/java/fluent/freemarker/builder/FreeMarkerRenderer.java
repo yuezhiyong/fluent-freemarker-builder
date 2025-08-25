@@ -1,13 +1,15 @@
 package fluent.freemarker.builder;
 
 import fluent.freemarker.ast.*;
+import fluent.freemarker.ast.expr.BinaryExpr;
 import fluent.freemarker.ast.expr.FtlExpr;
+import fluent.freemarker.ast.expr.IdentifierExpr;
+import fluent.freemarker.ast.expr.LiteralExpr;
 
 import java.util.List;
 import java.util.Map;
 
 public class FreeMarkerRenderer extends FtlBaseVisitor {
-
     private final StringBuilder sb = new StringBuilder();
 
     private void append(String line) {
@@ -15,101 +17,177 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
     }
 
     public String render(List<FtlNode> nodes) {
+        sb.setLength(0); // 清空之前的渲染结果
         for (FtlNode n : nodes) {
-            n.accept(this);
+            if (n != null) {
+                n.accept(this);
+            }
         }
         return sb.toString();
     }
 
     @Override
     public void visit(TextNode node) {
-        sb.append(node.getText());
+        if (node != null && node.getText() != null) {
+            sb.append(node.getText());
+        }
     }
 
     @Override
     public void visit(VarNode node) {
-        sb.append("${").append(node.getExpression()).append("}");
+        if (node != null && node.getExpression() != null) {
+            sb.append("${").append(node.getExpression()).append("}");
+        }
     }
 
     @Override
     public void visit(AssignNode node) {
-        append("<#assign " + node.getVarName() + " = " + node.getValueExpr() + ">");
+        if (node != null) {
+            append("<#assign " + node.getVarName() + " = " + node.getValueExpr() + ">");
+        }
     }
 
     @Override
     public void visit(IfNode node) {
-        append("<#if " + node.condition + ">");
-        for (FtlNode n : node.thenBlock) n.accept(this);
-        if (!node.elseBlock.isEmpty()) {
-            append("<#else>");
-            for (FtlNode n : node.elseBlock) n.accept(this);
+        if (node != null) {
+            append("<#if " + node.getCondition() + ">");
+            if (node.getThenBlock() != null) {
+                for (FtlNode n : node.getThenBlock()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            if (node.getElseBlock() != null && !node.getElseBlock().isEmpty()) {
+                append("<#else>");
+                for (FtlNode n : node.getElseBlock()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#if>");
         }
-        append("</#if>");
     }
 
     @Override
     public void visit(ListNode node) {
-        append("<#list " + node.listExpression + " as " + node.item + ">");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#list>");
+        if (node != null) {
+            append("<#list " + node.getListExpression() + " as " + node.getItem() + ">");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#list>");
+        }
     }
 
     @Override
     public void visit(MacroNode node) {
-        StringBuilder params = new StringBuilder();
-
-        for (Map.Entry<String, String> entry : node.params.entrySet()) {
-            params.append(entry.getKey());
-            if (entry.getKey() != null) {
-                params.append("=").append("\"").append(entry.getValue()).append("\"");
+        if (node != null) {
+            StringBuilder params = new StringBuilder();
+            if (node.getParams() != null) {
+                boolean first = true;
+                for (Map.Entry<String, String> entry : node.getParams().entrySet()) {
+                    if (!first) params.append(", ");
+                    params.append(entry.getKey());
+                    if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                        params.append("=").append("\"").append(entry.getValue()).append("\"");
+                    }
+                    first = false;
+                }
             }
-            params.append(" ");
+            append("<#macro " + node.getName());
+            if (params.length() > 0) {
+                append(" " + params.toString());
+            }
+            append(">");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#macro>");
         }
-        append("<#macro " + node.name + " " + params.toString().trim() + ">");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#macro>");
     }
 
     @Override
     public void visit(MacroCallNode node) {
-        StringBuilder args = new StringBuilder();
-        if (node.args != null) {
-            for (Map.Entry<String, FtlExpr> entry : node.args.entrySet()) {
-                args.append(entry.getKey()).append("=").append(entry.getValue()).append(" ");
+        if (node != null) {
+            StringBuilder args = new StringBuilder();
+            if (node.getArgs() != null && !node.getArgs().isEmpty()) {
+                for (Map.Entry<String, FtlExpr> entry : node.getArgs().entrySet()) {
+                    if (args.length() > 0) args.append(" ");
+                    args.append(entry.getKey()).append("=").append(renderExpr(entry.getValue()));
+                }
+            }
+            if (args.length() > 0) {
+                append("<@" + node.getName() + " " + args.toString() + " />");
+            } else {
+                append("<@" + node.getName() + " />");
             }
         }
-        append("<@" + node.name + " " + args.toString().trim() + " />");
     }
 
     @Override
     public void visit(IncludeNode node) {
-        append("<#include \"" + node.template + "\">");
+        if (node != null) {
+            StringBuilder params = new StringBuilder();
+            if (node.getParams() != null && !node.getParams().isEmpty()) {
+                for (Map.Entry<String, FtlExpr> entry : node.getParams().entrySet()) {
+                    if (params.length() > 0) params.append(" ");
+                    params.append(entry.getKey()).append("=").append(renderExpr(entry.getValue()));
+                }
+            }
+            if (params.length() > 0) {
+                append("<#include \"" + node.getTemplate() + "\" " + params.toString() + ">");
+            } else {
+                append("<#include \"" + node.getTemplate() + "\">");
+            }
+        }
     }
 
     @Override
     public void visit(CommentNode node) {
-        append("<#-- " + node.getText() + " -->");
+        if (node != null && node.getText() != null) {
+            append("<#-- " + node.getText() + " -->");
+        }
     }
 
     @Override
     public void visit(CompressNode node) {
-        append("<#compress>");
-        for (FtlNode n : node.getBody()) n.accept(this);
-        append("</#compress>");
+        if (node != null) {
+            append("<#compress>");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#compress>");
+        }
     }
 
     @Override
     public void visit(EscapeNode node) {
-        append("<#escape " + node.expr + " as " + node.asVar + ">");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#escape>");
+        if (node != null) {
+            append("<#escape " + node.getAsVar() + " in " + node.getExpr() + ">");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#escape>");
+        }
     }
 
     @Override
     public void visit(NoEscapeNode node) {
-        append("<#noescape>");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#noescape>");
+        if (node != null) {
+            append("<#noescape>");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#noescape>");
+        }
     }
 
     @Override
@@ -119,35 +197,63 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
 
     @Override
     public void visit(AttemptNode node) {
-        append("<#attempt>");
-        for (FtlNode n : node.attemptBody) n.accept(this);
-        if (!node.recoverBody.isEmpty()) {
-            append("<#recover>");
-            for (FtlNode n : node.recoverBody) n.accept(this);
-            append("</#recover>\n");
+        if (node != null) {
+            append("<#attempt>");
+            if (node.getAttemptBody() != null) {
+                for (FtlNode n : node.getAttemptBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            if (node.getRecoverBody() != null && !node.getRecoverBody().isEmpty()) {
+                append("<#recover>");
+                for (FtlNode n : node.getRecoverBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#attempt>");
         }
-        append("</#attempt>");
     }
 
     @Override
     public void visit(SwitchNode node) {
-        append("<#switch " + node.expr + ">");
-        for (CaseNode c : node.cases) c.accept(this);
-        if (!node.defaultBody.isEmpty()) {
-            append("<#default>");
-            for (FtlNode n : node.defaultBody) n.accept(this);
+        if (node != null) {
+            append("<#switch " + renderExpr(node.getExpr()) + ">");
+            if (node.getCases() != null) {
+                for (CaseNode c : node.getCases()) {
+                    if (c != null) c.accept(this);
+                }
+            }
+            if (node.getDefaultBody() != null && !node.getDefaultBody().isEmpty()) {
+                append("<#default>");
+                for (FtlNode n : node.getDefaultBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#switch>");
         }
-        append("</#switch>");
     }
 
     @Override
     public void visit(CaseNode node) {
-        StringBuilder values = new StringBuilder();
-        for (FtlExpr value : node.values) {
-            values.append(value).append(" ");
+        if (node != null) {
+            StringBuilder values = new StringBuilder();
+            if (node.getValues() != null) {
+                for (FtlExpr value : node.getValues()) {
+                    if (values.length() > 0) values.append(" ");
+                    values.append(renderExpr(value));
+                }
+            }
+            if (values.length() > 0) {
+                append("<#case " + values.toString() + ">");
+            } else {
+                append("<#case>");
+            }
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
         }
-        append("<#case " + values.toString().trim() + ">");
-        for (FtlNode n : node.body) n.accept(this);
     }
 
     @Override
@@ -162,48 +268,71 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
 
     @Override
     public void visit(ReturnNode node) {
-        append("<#return " + node.getExpr() + ">");
+        if (node != null) {
+            append("<#return " + renderExpr(node.getExpr()) + ">");
+        }
     }
 
     @Override
     public void visit(StopNode node) {
-        append("<#stop " + node.getExpr() + ">");
+        if (node != null) {
+            append("<#stop " + renderExpr(node.getExpr()) + ">");
+        }
     }
 
     @Override
     public void visit(ItemsNode node) {
-        append("<#items>");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#items>");
+        if (node != null) {
+            append("<#items>");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#items>");
+        }
     }
 
     @Override
     public void visit(SepNode node) {
-        append("<#sep>");
-        for (FtlNode n : node.body) n.accept(this);
-        append("</#sep>");
+        if (node != null) {
+            append("<#sep>");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#sep>");
+        }
     }
 
     @Override
     public void visit(ImportNode node) {
-        append("<#import \"" + node.template + "\" as " + node.namespaceVar + ">");
+        if (node != null) {
+            append("<#import \"" + node.getTemplate() + "\" as " + node.getNamespaceVar() + ">");
+        }
     }
 
     @Override
     public void visit(VisitNode node) {
-        if (node == null || node.args.entrySet() == null) {
-            return;
+        if (node != null) {
+            StringBuilder args = new StringBuilder();
+            if (node.getArgs() != null) {
+                for (Map.Entry<String, FtlExpr> entry : node.getArgs().entrySet()) {
+                    if (args.length() > 0) args.append(" ");
+                    args.append(entry.getKey()).append("=").append(renderExpr(entry.getValue()));
+                }
+            }
+            String argsStr = args.length() > 0 ? " " + args.toString() : "";
+            append("<#visit " + renderExpr(node.getNodeExpr()) + argsStr + ">");
         }
-        StringBuilder args = new StringBuilder();
-        for (Map.Entry<String, FtlExpr> entry : node.args.entrySet()) {
-            args.append(entry.getKey()).append("=").append(entry.getValue()).append(" ");
-        }
-        append("<#visit " + node.nodeExpr + " " + args.toString().trim() + ">");
     }
 
     @Override
     public void visit(RecurseNode node) {
-        append("<#recurse " + node.expr + ">");
+        if (node != null) {
+            append("<#recurse " + renderExpr(node.getExpr()) + ">");
+        }
     }
 
     @Override
@@ -213,28 +342,63 @@ public class FreeMarkerRenderer extends FtlBaseVisitor {
 
     @Override
     public void visit(NestedNode node) {
-        append("<#nested>");
-        for (FtlNode n : node.getBody()) n.accept(this);
-        append("</#nested>");
+        if (node != null) {
+            append("<#nested>");
+            if (node.getBody() != null) {
+                for (FtlNode n : node.getBody()) {
+                    if (n != null) n.accept(this);
+                }
+            }
+            append("</#nested>");
+        }
     }
 
     @Override
     public void visit(GlobalNode node) {
-        append("<#global " + node.var + " = " + node.expr + ">");
+        if (node != null) {
+            append("<#global " + node.getVar() + " = " + renderExpr(node.getExpr()) + ">");
+        }
     }
 
     @Override
     public void visit(LocalNode node) {
-        append("<#local " + node.var + " = " + node.expr + ">");
+        if (node != null) {
+            append("<#local " + node.getVar() + " = " + renderExpr(node.getExpr()) + ">");
+        }
     }
 
     @Override
     public void visit(SettingNode node) {
-        append("<#setting " + node.key + " = " + node.value + ">");
+        if (node != null) {
+            append("<#setting " + node.getKey() + " = " + renderExpr(node.getValue()) + ">");
+        }
     }
 
     @Override
-    public void visit(NewlineNode newlineNode) {
+    public void visit(NewlineNode node) {
         append("\n");
+    }
+
+    /**
+     * 渲染表达式为字符串
+     */
+    private String renderExpr(FtlExpr expr) {
+        if (expr == null) return "";
+
+        if (expr instanceof IdentifierExpr) {
+            return ((IdentifierExpr) expr).getName();
+        } else if (expr instanceof LiteralExpr) {
+            Object value = ((LiteralExpr) expr).getValue();
+            if (value instanceof String) {
+                return "\"" + value.toString().replace("\"", "\\\"") + "\"";
+            } else {
+                return value != null ? value.toString() : "null";
+            }
+        } else if (expr instanceof BinaryExpr) {
+            BinaryExpr binary = (BinaryExpr) expr;
+            return renderExpr(binary.getLeft()) + " " + binary.getOp() + " " + renderExpr(binary.getRight());
+        } else {
+            return expr.toString();
+        }
     }
 }
